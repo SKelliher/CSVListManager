@@ -1,0 +1,33 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+
+# Packaging and build output
+build/
+dist/
+*.egg-info/
+
+# Local credentials and environment overrides
+.env
+.env.*
+!.env.example
+
+# Personal configuration and real CSV data stores
+/config/local.yaml
+/data/
+/local/
+
+# Editor and operating-system files
+.vscode/
+.idea/
+.DS_Store
+*~
