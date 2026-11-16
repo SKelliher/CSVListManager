@@ -5,6 +5,7 @@ from __future__ import annotations
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import ipaddress
 import json
+from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
@@ -13,6 +14,15 @@ from .errors import CSVListManagerError, NotFoundError, ValidationError
 
 
 MAX_BODY = 2 * 1024 * 1024
+STATIC_ROOT = Path(__file__).with_name("static")
+STATIC_FILES = {
+    "/": ("index.html", "text/html; charset=utf-8"),
+    "/index.html": ("index.html", "text/html; charset=utf-8"),
+    "/app.js": ("app.js", "text/javascript; charset=utf-8"),
+    "/model.js": ("model.js", "text/javascript; charset=utf-8"),
+    "/styles.css": ("styles.css", "text/css; charset=utf-8"),
+}
+CONTENT_SECURITY_POLICY = "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
 
 
 class CSVListManagerHTTPServer(ThreadingHTTPServer):
@@ -47,6 +57,9 @@ class RequestHandler(BaseHTTPRequestHandler):
         query = parse_qs(parsed.query)
         app = self.server.application
         if method == "GET":
+            if path in STATIC_FILES:
+                self._static(path)
+                return
             if path == "/api/health":
                 self._json(200, {"status": "ok"})
                 return
@@ -102,6 +115,22 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
+        self.end_headers()
+        self.wfile.write(data)
+
+    def _static(self, request_path: str) -> None:
+        filename, content_type = STATIC_FILES[request_path]
+        try:
+            data = (STATIC_ROOT / filename).read_bytes()
+        except OSError:
+            raise NotFoundError(f"Interface asset {filename} is unavailable")
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Content-Security-Policy", CONTENT_SECURITY_POLICY)
+        self.send_header("Referrer-Policy", "no-referrer")
         self.end_headers()
         self.wfile.write(data)
 

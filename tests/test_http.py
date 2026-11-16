@@ -58,6 +58,22 @@ class HTTPServiceTests(unittest.TestCase):
         loaded = self.request("GET", "/api/repository?repository=sample")
         self.assertEqual(len(loaded["rows"]), 4)
 
+    def test_browser_interface_is_served_with_local_only_assets(self):
+        for path, content_type, marker in (
+            ("/", "text/html; charset=utf-8", b"CSVListManager"),
+            ("/app.js", "text/javascript; charset=utf-8", b"loadRepositories"),
+            ("/model.js", "text/javascript; charset=utf-8", b"sortedRows"),
+            ("/styles.css", "text/css; charset=utf-8", b"position: sticky"),
+        ):
+            with self.subTest(path=path), urlopen(self.base + path, timeout=5) as response:
+                self.assertEqual(response.status, 200)
+                self.assertEqual(response.headers["Content-Type"], content_type)
+                self.assertIn(marker, response.read())
+                self.assertEqual(response.headers["Content-Security-Policy"].split(";")[0], "default-src 'self'")
+
+    def test_unknown_interface_asset_is_404(self):
+        self.request("GET", "/missing.js", expected=404)
+
     def test_save_mode_and_log_over_http(self):
         loaded = self.request("GET", "/api/repository")
         saved = self.request(

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>CSVListManager</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <h1>CSVListManager</h1>
+      <p>Plain CSV. Local control.</p>
+    </div>
+    <div class="toolbar" aria-label="Repository and editing controls">
+      <label class="control-label" for="repository-select">Repository</label>
+      <select id="repository-select" aria-label="Selected repository"></select>
+      <button id="reload-button" type="button" title="Reload the CSV from disk">Reload</button>
+      <span class="toolbar-separator" aria-hidden="true"></span>
+      <button id="mode-button" type="button">Switch to read-only</button>
+      <button id="add-row-button" class="secondary" type="button">Add row</button>
+      <button id="save-button" class="primary" type="button" disabled>Save</button>
+    </div>
+  </header>
+
+  <section class="status-bar" aria-label="Application status">
+    <span id="mode-indicator" class="badge">Editable</span>
+    <span id="dirty-indicator" class="badge dirty" hidden>Unsaved changes</span>
+    <span id="status-message" role="status" aria-live="polite">Loading repositories…</span>
+    <span class="keyboard-hint">Ctrl/Cmd+S to save</span>
+  </section>
+
+  <main class="workspace">
+    <section class="grid-panel" aria-label="CSV records">
+      <div class="grid-scroll">
+        <table id="data-grid">
+          <thead id="grid-head"></thead>
+          <tbody id="grid-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <aside class="note-panel" aria-labelledby="note-heading">
+      <div class="note-heading-row">
+        <h2 id="note-heading">Note editor</h2>
+        <span id="note-mode" class="note-mode"></span>
+      </div>
+      <p id="note-location">Select a note cell to view its full contents.</p>
+      <textarea id="note-editor" aria-label="Selected note" placeholder="No note selected" disabled spellcheck="false"></textarea>
+      <p class="note-help">Notes preserve embedded newlines. Select any note cell even in read-only mode.</p>
+    </aside>
+  </main>
+
+  <noscript>CSVListManager requires JavaScript for its local editing interface.</noscript>
+</body>
+</html>

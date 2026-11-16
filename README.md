@@ -2,7 +2,7 @@
 
 CSVListManager is a configurable, local grid for editing plain RFC 4180 CSV data stores. The CSV remains the source of truth: there is no database, shadow index, cloud account, or runtime network dependency.
 
-This repository contains a Python standard-library service and will gain an HTML/vanilla-JavaScript grid in the next implementation phase. The service provides typed schemas, human-editable lookup files, safe explicit saves, repository preferences, and an append-only CSV change log.
+This repository contains a Python standard-library service and a dependency-free HTML/vanilla-JavaScript grid. Together they provide typed schemas, human-editable lookup files, safe explicit saves, repository preferences, stable view-only sorting, and an append-only CSV change log.
 
 ## Implemented in this phase
 
@@ -13,15 +13,20 @@ This repository contains a Python standard-library service and will gain an HTML
 - Atomic temporary-file-and-replace saves and revision checks that prevent overwriting external edits.
 - New-row appends and optional `on_create`/`on_update` datetime columns.
 - Append-only cell-edit, row-addition, and save log events.
-- A localhost-only JSON HTTP API.
-- A completely synthetic NextAct example and automated unit/HTTP integration tests.
+- A localhost-only JSON HTTP API and locally served browser interface.
+- Sticky-header grid with stable ascending/descending sorting and no file reordering.
+- Native date/datetime controls, text inputs, lookup dropdowns, and a full multi-line note pane.
+- Add-row workflow, explicit Save button/shortcut, dirty indicator, and unsaved-change warnings.
+- A completely synthetic NextAct example and automated unit/HTTP/JavaScript tests.
 
-The browser grid and external script runner are not implemented yet. The live personal NextAct store is not connected by any shipped configuration.
+The external script runner and in-app change-log viewer are not implemented yet. The live personal NextAct store is not connected by any shipped configuration.
 
 ## Requirements
 
 - Python 3.11 or later
+- A modern browser
 - No runtime packages outside the Python standard library
+- Node.js 20 or later only for the optional JavaScript model tests
 
 ## Run against the synthetic example
 
@@ -32,9 +37,19 @@ python3 -m csvlistmanager --config config.example.yaml --check
 python3 -m csvlistmanager --config config.example.yaml
 ```
 
-The service listens on `127.0.0.1:8765`. `--port 0` selects an available port. Non-loopback bind addresses are rejected.
+The service listens on `127.0.0.1:8765`. Open <http://127.0.0.1:8765> in a browser to use the grid. `--port 0` selects an available port. Non-loopback bind addresses are rejected.
 
 The checked-in example can be edited through the API, so its files will become modified after saves. To keep the checkout pristine, copy `examples/nextact` and `config.example.yaml` to a local directory and adjust the paths in the copied configuration. The ignored `local/` directory is suitable for experiments.
+
+## Browser editing
+
+Click a non-note column heading to sort ascending, again for descending, and a third time to restore file order. Sorting changes only the view. Empty values sort last, and equal values retain their stable file order.
+
+Text, date/datetime, and dropdown fields edit inline. Existing values that are invalid for a native date/datetime control fall back to a text input so they remain visible and unchanged. Unknown dropdown values are displayed as such. Managed datetime columns are visible but locked because the service owns their values.
+
+Select any note cell to open the full note pane. Note edits retain the cell's original newline convention, including CRLF embedded newlines. In read-only mode, notes remain selectable and readable while all editing and saving controls are disabled.
+
+**Add row** creates an in-memory row; **Save** or Ctrl/Cmd+S writes all pending changes explicitly. New rows always append at the bottom of the CSV regardless of view sorting. Reload, repository switching, and browser closing protect unsaved changes with warnings. A revision conflict leaves edits in the grid and requires an explicit reload rather than silently overwriting external changes.
 
 ## Configuration
 
@@ -119,9 +134,10 @@ Requirements and the implementation plan are in `docs/`.
 
 ```sh
 python3 -m unittest discover -s tests -v
+node --test tests/js/*.test.mjs
 ```
 
-Tests copy the synthetic repository into temporary directories. Coverage includes byte-identical no-op round trips, exact field-level edits, embedded newlines, managed timestamps, appended rows, schema changes, read-only enforcement, external-edit conflicts, logging, and live localhost HTTP requests.
+Tests copy the synthetic repository into temporary directories. Python coverage includes byte-identical no-op round trips, exact field-level edits, embedded newlines, managed timestamps, appended rows, schema changes, read-only enforcement, external-edit conflicts, logging, static assets, and live localhost HTTP requests. JavaScript model tests cover stable sorting, file-order preservation, minimal save payloads, appended-row order, native editor fallback, and note newline preservation.
 
 ## License
 

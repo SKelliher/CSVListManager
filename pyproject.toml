@@ -17,3 +17,6 @@ csvlistmanager = "csvlistmanager.__main__:main"
 
 [tool.setuptools.packages.find]
 include = ["csvlistmanager*"]
+
+[tool.setuptools.package-data]
+csvlistmanager = ["static/*"]
