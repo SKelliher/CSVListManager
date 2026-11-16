@@ -80,6 +80,9 @@ class RequestHandler(BaseHTTPRequestHandler):
             if path == "/api/preferences/mode":
                 self._json(200, app.set_mode(payload.get("repository"), payload.get("mode")))
                 return
+            if path == "/api/preferences/view":
+                self._json(200, app.set_view_preferences(payload))
+                return
             if path == "/api/save":
                 self._json(200, app.save(payload))
                 return

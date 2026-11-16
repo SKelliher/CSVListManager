@@ -56,6 +56,35 @@ export function sortedRows(rows, columns, sort) {
   return copy;
 }
 
+export const MIN_COLUMN_WIDTH = 80;
+export const MAX_COLUMN_WIDTH = 600;
+
+export function clampColumnWidth(width) {
+  return Math.min(MAX_COLUMN_WIDTH, Math.max(MIN_COLUMN_WIDTH, Math.round(width)));
+}
+
+export function filteredRows(rows, columns, filters) {
+  const active = [...filters].filter(([name]) => {
+    const column = columns.find((candidate) => candidate.name === name);
+    return column && (column.type === "date" || column.type === "dropdown");
+  });
+  if (!active.length) return [...rows];
+  return rows.filter((row) => active.every(([name, value]) => (row.values[name] ?? "") === value));
+}
+
+export function filterValues(rows, column, lookupEntries = []) {
+  const values = new Set([""]);
+  if (column.type === "dropdown") {
+    for (const entry of lookupEntries) values.add(entry.value);
+  }
+  for (const row of rows) values.add(row.values[column.name] ?? "");
+  const nonEmpty = [...values].filter((value) => value !== "");
+  nonEmpty.sort((left, right) => column.type === "date"
+    ? left < right ? -1 : left > right ? 1 : 0
+    : left.localeCompare(right));
+  return ["", ...nonEmpty];
+}
+
 export function isISODate(value) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   if (!match) return false;

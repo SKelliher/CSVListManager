@@ -1,10 +1,15 @@
 import {
   buildSavePayload,
+  clampColumnWidth,
   collectChanges,
   editorKind,
+  filteredRows,
+  filterValues,
   fromEditorValue,
   fromTextareaValue,
   hasUnsavedChanges,
+  MAX_COLUMN_WIDTH,
+  MIN_COLUMN_WIDTH,
   noteNewline,
   sortedRows,
   toEditorValue,
@@ -14,11 +19,18 @@ const elements = {
   repository: document.querySelector("#repository-select"),
   reload: document.querySelector("#reload-button"),
   mode: document.querySelector("#mode-button"),
+  noteToggle: document.querySelector("#note-toggle"),
   add: document.querySelector("#add-row-button"),
   save: document.querySelector("#save-button"),
   modeIndicator: document.querySelector("#mode-indicator"),
   dirtyIndicator: document.querySelector("#dirty-indicator"),
   status: document.querySelector("#status-message"),
+  filterCount: document.querySelector("#filter-count"),
+  clearFilters: document.querySelector("#clear-filters"),
+  workspace: document.querySelector(".workspace"),
+  notePanel: document.querySelector("#note-panel"),
+  grid: document.querySelector("#data-grid"),
+  gridColumns: document.querySelector("#grid-columns"),
   head: document.querySelector("#grid-head"),
   body: document.querySelector("#grid-body"),
   noteLocation: document.querySelector("#note-location"),
@@ -37,10 +49,15 @@ const state = {
   originalRows: [],
   originals: new Map(),
   sort: null,
+  filters: new Map(),
+  noteVisible: true,
+  columnWidths: {},
   selectedNote: null,
   selectedNoteNewline: "\n",
   newRowCounter: 0,
   busy: false,
+  viewRequest: 0,
+  viewSaveTimer: null,
 };
 
 async function api(path, options = {}) {
@@ -87,12 +104,16 @@ function updateControls() {
   elements.repository.disabled = state.busy;
   elements.reload.disabled = state.busy || !hasRepository;
   elements.mode.disabled = state.busy || !hasRepository;
+  elements.noteToggle.disabled = state.busy || !hasRepository;
   elements.add.disabled = state.busy || !hasRepository || state.mode === "read-only";
   elements.save.disabled = state.busy || !hasRepository || !hasChanges || state.mode === "read-only";
   elements.mode.textContent = state.mode === "read-only" ? "Switch to editable" : "Switch to read-only";
+  elements.noteToggle.textContent = state.noteVisible ? "Hide note editor" : "Show note editor";
+  elements.noteToggle.setAttribute("aria-expanded", String(state.noteVisible));
   elements.modeIndicator.textContent = state.mode === "read-only" ? "Read-only" : "Editable";
   elements.modeIndicator.classList.toggle("read-only", state.mode === "read-only");
   elements.dirtyIndicator.hidden = !hasChanges;
+  elements.clearFilters.disabled = state.busy || state.filters.size === 0;
   document.title = `${hasChanges ? "* " : ""}CSVListManager`;
 }
 
@@ -107,13 +128,143 @@ function renderRepositoryOptions() {
   if (state.repositoryId) elements.repository.value = state.repositoryId;
 }
 
+function defaultColumnWidth(column) {
+  if (column.type === "note") return 300;
+  if (column.type === "datetime") return 180;
+  if (column.type === "date" || column.type === "dropdown") return 155;
+  return 230;
+}
+
+function columnWidth(column) {
+  return state.columnWidths[column.name] || defaultColumnWidth(column);
+}
+
+function renderColumns() {
+  const columns = [document.createElement("col")];
+  columns[0].style.width = "60px";
+  let total = 60;
+  for (const column of state.columns) {
+    const definition = document.createElement("col");
+    const width = columnWidth(column);
+    definition.style.width = `${width}px`;
+    columns.push(definition);
+    total += width;
+  }
+  elements.gridColumns.replaceChildren(...columns);
+  elements.grid.style.width = `${total}px`;
+  elements.grid.style.minWidth = "100%";
+}
+
+function persistView() {
+  const repository = state.repositoryId;
+  if (!repository) return Promise.resolve();
+  const request = ++state.viewRequest;
+  const payload = {
+    repository,
+    note_visible: state.noteVisible,
+    column_widths: { ...state.columnWidths },
+  };
+  return api("/api/preferences/view", { method: "POST", body: JSON.stringify(payload) })
+    .then((view) => {
+      if (request === state.viewRequest && repository === state.repositoryId) {
+        state.noteVisible = view.note_visible;
+        state.columnWidths = { ...view.column_widths };
+      }
+    })
+    .catch((error) => setStatus(`View preference could not be saved: ${error.message}`, true));
+}
+
+function persistViewSoon() {
+  window.clearTimeout(state.viewSaveTimer);
+  state.viewSaveTimer = window.setTimeout(() => void persistView(), 250);
+}
+
+function createResizer(column) {
+  const handle = document.createElement("span");
+  handle.className = "column-resizer";
+  handle.setAttribute("role", "separator");
+  handle.tabIndex = 0;
+  handle.setAttribute("aria-label", `Resize ${column.name} column`);
+  handle.setAttribute("aria-orientation", "vertical");
+  handle.setAttribute("aria-valuemin", String(MIN_COLUMN_WIDTH));
+  handle.setAttribute("aria-valuemax", String(MAX_COLUMN_WIDTH));
+  handle.setAttribute("aria-valuenow", String(columnWidth(column)));
+
+  function setWidth(width) {
+    const next = clampColumnWidth(width);
+    state.columnWidths = { ...state.columnWidths, [column.name]: next };
+    handle.setAttribute("aria-valuenow", String(next));
+    renderColumns();
+  }
+
+  handle.addEventListener("pointerdown", (event) => {
+    if (state.busy || event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const startX = event.clientX;
+    const startWidth = columnWidth(column);
+    handle.setPointerCapture(event.pointerId);
+    handle.classList.add("dragging");
+
+    function move(moveEvent) {
+      setWidth(startWidth + moveEvent.clientX - startX);
+    }
+    function finish() {
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", finish);
+      handle.removeEventListener("pointercancel", finish);
+      handle.classList.remove("dragging");
+      void persistView();
+    }
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", finish);
+    handle.addEventListener("pointercancel", finish);
+  });
+
+  handle.addEventListener("keydown", (event) => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    const step = event.shiftKey ? 50 : 10;
+    setWidth(columnWidth(column) + (event.key === "ArrowRight" ? step : -step));
+    persistViewSoon();
+  });
+  return handle;
+}
+
+function createFilter(column) {
+  const select = document.createElement("select");
+  select.className = "filter-select";
+  select.dataset.filterColumn = column.name;
+  select.setAttribute("aria-label", `Filter ${column.name}`);
+  select.disabled = state.busy;
+  appendOption(select, "all", "All values");
+  const selected = state.filters.has(column.name) ? JSON.stringify(state.filters.get(column.name)) : "all";
+  for (const value of filterValues(state.rows, column, state.lookups[column.name] || [])) {
+    appendOption(select, JSON.stringify(value), value === "" ? "(Blank)" : value);
+  }
+  select.value = selected;
+  select.addEventListener("change", () => {
+    if (select.value === "all") state.filters.delete(column.name);
+    else state.filters.set(column.name, JSON.parse(select.value));
+    renderGrid();
+    updateControls();
+  });
+  return select;
+}
+
 function renderHeader() {
   const row = document.createElement("tr");
+  const filterRow = document.createElement("tr");
+  filterRow.className = "filter-row";
   const number = document.createElement("th");
   number.className = "row-number";
   number.scope = "col";
   number.textContent = "#";
   row.append(number);
+  const filterNumber = document.createElement("th");
+  filterNumber.className = "row-number filter-heading";
+  filterNumber.textContent = "Filter";
+  filterRow.append(filterNumber);
 
   for (const column of state.columns) {
     const heading = document.createElement("th");
@@ -148,9 +299,20 @@ function renderHeader() {
       });
       heading.append(button);
     }
+    heading.append(createResizer(column));
     row.append(heading);
+
+    const filterCell = document.createElement("th");
+    filterCell.className = "filter-cell";
+    if (column.type === "date" || column.type === "dropdown") {
+      filterCell.append(createFilter(column));
+    } else {
+      filterCell.classList.add("filter-unavailable");
+      filterCell.textContent = "—";
+    }
+    filterRow.append(filterCell);
   }
-  elements.head.replaceChildren(row);
+  elements.head.replaceChildren(row, filterRow);
 }
 
 function appendOption(select, value, label) {
@@ -158,6 +320,13 @@ function appendOption(select, value, label) {
   option.value = value;
   option.textContent = label;
   select.append(option);
+}
+
+function refreshFilteredColumn(column) {
+  if (state.filters.has(column.name)) {
+    renderGrid();
+    updateControls();
+  }
 }
 
 function createDropdown(row, column, disabled) {
@@ -176,7 +345,10 @@ function createDropdown(row, column, disabled) {
   const current = row.values[column.name];
   if (current && !known.has(current)) appendOption(select, current, `${current} (not in lookup)`);
   select.value = current;
-  select.addEventListener("change", () => updateCell(row, column, select.value, select));
+  select.addEventListener("change", () => {
+    updateCell(row, column, select.value, select);
+    refreshFilteredColumn(column);
+  });
   return select;
 }
 
@@ -194,6 +366,7 @@ function createInput(row, column, disabled) {
   input.addEventListener("input", () => {
     updateCell(row, column, fromEditorValue(column, input.value), input);
   });
+  input.addEventListener("change", () => refreshFilteredColumn(column));
   return input;
 }
 
@@ -219,7 +392,13 @@ function createNoteButton(row, column) {
   return button;
 }
 
+function updateFilterControls(visibleCount) {
+  elements.filterCount.textContent = `Showing ${visibleCount} of ${state.rows.length} rows`;
+  elements.clearFilters.disabled = state.busy || state.filters.size === 0;
+}
+
 function renderGrid() {
+  renderColumns();
   renderHeader();
   elements.body.replaceChildren();
   if (!state.columns.length) {
@@ -229,17 +408,22 @@ function renderGrid() {
     cell.textContent = state.busy ? "Loading…" : "No repository loaded.";
     row.append(cell);
     elements.body.append(row);
+    updateFilterControls(0);
     return;
   }
 
   const changed = new Map(collectChanges(state.rows, state.originalRows).map((change) => [change.row, change.values]));
-  const visibleRows = sortedRows(state.rows, state.columns, state.sort);
+  const matchingRows = filteredRows(state.rows, state.columns, state.filters);
+  const visibleRows = sortedRows(matchingRows, state.columns, state.sort);
+  updateFilterControls(matchingRows.length);
   if (!visibleRows.length) {
     const row = document.createElement("tr");
     const cell = document.createElement("td");
     cell.className = "empty-row";
     cell.colSpan = state.columns.length + 1;
-    cell.textContent = "This store has no records. Use Add row to create one.";
+    cell.textContent = state.rows.length
+      ? "No rows match the active filters. Clear filters to see all records."
+      : "This store has no records. Use Add row to create one.";
     row.append(cell);
     elements.body.append(row);
     return;
@@ -303,8 +487,14 @@ function renderNote() {
   elements.noteMode.textContent = state.mode === "read-only" ? "Read-only" : "";
 }
 
+function renderWorkspace() {
+  elements.notePanel.hidden = !state.noteVisible;
+  elements.workspace.classList.toggle("note-hidden", !state.noteVisible);
+}
+
 function renderAll() {
   renderRepositoryOptions();
+  renderWorkspace();
   renderGrid();
   renderNote();
   updateControls();
@@ -319,18 +509,30 @@ function updateCell(row, column, value, editor) {
 
 async function loadRepository(repositoryId) {
   state.busy = true;
+  state.viewRequest += 1;
   updateControls();
   setStatus("Loading repository…");
   try {
     const payload = await api(`/api/repository?repository=${encodeURIComponent(repositoryId)}`);
+    const repositoryChanged = state.repositoryId !== payload.repository.id;
     state.repositoryId = payload.repository.id;
     state.mode = payload.mode;
+    state.noteVisible = payload.view.note_visible;
+    state.columnWidths = { ...payload.view.column_widths };
     state.revision = payload.revision;
     state.columns = payload.schema.columns;
     state.lookups = payload.lookups;
     state.rows = payload.rows.map((row) => ({ key: row.index, index: row.index, values: { ...row.values }, isNew: false }));
     state.originalRows = payload.rows.map((row) => ({ index: row.index, values: { ...row.values } }));
     state.originals = new Map(state.originalRows.map((row) => [row.index, row]));
+    if (repositoryChanged) {
+      state.filters = new Map();
+    } else {
+      state.filters = new Map([...state.filters].filter(([name]) => {
+        const column = state.columns.find((candidate) => candidate.name === name);
+        return column && (column.type === "date" || column.type === "dropdown");
+      }));
+    }
     state.selectedNote = null;
     state.busy = false;
     renderAll();
@@ -406,6 +608,23 @@ async function toggleMode() {
   }
 }
 
+function toggleNoteVisibility() {
+  if (!state.repositoryId || state.busy) return;
+  state.noteVisible = !state.noteVisible;
+  renderWorkspace();
+  updateControls();
+  setStatus(state.noteVisible ? "Note editor shown." : "Note editor hidden; note cells remain available.");
+  void persistView();
+}
+
+function clearFilters() {
+  if (!state.filters.size || state.busy) return;
+  state.filters.clear();
+  renderGrid();
+  updateControls();
+  setStatus("Filters cleared.");
+}
+
 function addRow() {
   if (!state.repositoryId || state.busy || state.mode === "read-only") return;
   const key = `new-${++state.newRowCounter}`;
@@ -443,6 +662,8 @@ async function save() {
 elements.repository.addEventListener("change", changeRepository);
 elements.reload.addEventListener("click", reloadRepository);
 elements.mode.addEventListener("click", toggleMode);
+elements.noteToggle.addEventListener("click", toggleNoteVisibility);
+elements.clearFilters.addEventListener("click", clearFilters);
 elements.add.addEventListener("click", addRow);
 elements.save.addEventListener("click", save);
 

@@ -7,7 +7,7 @@ import tempfile
 import unittest
 
 from csvlistmanager.app import Application
-from csvlistmanager.errors import ConflictError, ReadOnlyError
+from csvlistmanager.errors import ConflictError, ReadOnlyError, ValidationError
 
 from tests.helpers import install_example
 
@@ -78,6 +78,23 @@ class ApplicationTests(unittest.TestCase):
         self.assertEqual(self.store.read_bytes(), before)
         restarted = Application.from_config(self.config)
         self.assertEqual(restarted.load_repository()["mode"], "read-only")
+
+    def test_view_preferences_are_validated_and_persisted(self):
+        self.assertEqual(self.app.load_repository()["view"], {"note_visible": True, "column_widths": {}})
+        view = self.app.set_view_preferences(
+            {"repository": "sample", "note_visible": False, "column_widths": {"Label": 275, "Detail": 400}}
+        )
+        self.assertEqual(view, {"note_visible": False, "column_widths": {"Label": 275, "Detail": 400}})
+        restarted = Application.from_config(self.config)
+        self.assertEqual(restarted.load_repository()["view"], view)
+        for invalid in (
+            {"repository": "sample", "note_visible": "yes", "column_widths": {}},
+            {"repository": "sample", "note_visible": True, "column_widths": {"Missing": 200}},
+            {"repository": "sample", "note_visible": True, "column_widths": {"Label": 20}},
+            {"repository": "sample", "note_visible": True, "column_widths": {"Label": True}},
+        ):
+            with self.subTest(invalid=invalid), self.assertRaises(ValidationError):
+                self.app.set_view_preferences(invalid)
 
     def test_selected_repository_and_row_addition(self):
         selected = self.app.select_repository("sample")

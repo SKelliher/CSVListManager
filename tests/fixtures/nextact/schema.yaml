@@ -1,0 +1,18 @@
+columns:
+  - name: Priority
+    type: dropdown
+    lookup:
+      values: [A, B, C, Z]
+  - name: Next
+    type: date
+  - name: Last
+    type: date
+  - name: Tag
+    type: dropdown
+    lookup:
+      file: nextact_tags.csv
+      column: tag
+  - name: Label
+    type: text
+  - name: Detail
+    type: note

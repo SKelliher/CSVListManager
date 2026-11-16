@@ -3,8 +3,11 @@ import assert from "node:assert/strict";
 
 import {
   buildSavePayload,
+  clampColumnWidth,
   collectChanges,
   editorKind,
+  filteredRows,
+  filterValues,
   fromEditorValue,
   fromTextareaValue,
   hasUnsavedChanges,
@@ -80,6 +83,58 @@ test("invalid stored dates use text editors without rewriting values", () => {
   assert.equal(editorKind(datetime, "2026-11-16 14:30"), "datetime-local");
   assert.equal(toEditorValue(datetime, "2026-11-16 14:30"), "2026-11-16T14:30");
   assert.equal(fromEditorValue(datetime, "2026-11-16T14:30"), "2026-11-16 14:30");
+});
+
+test("exact filters support dates, blank values, unknown dropdowns, and AND composition", () => {
+  const filterColumns = [
+    { name: "Priority", type: "dropdown" },
+    { name: "Next", type: "date" },
+    { name: "Label", type: "text" },
+  ];
+  const rows = [
+    { index: 0, values: { Priority: "A", Next: "2026-11-16", Label: "One" } },
+    { index: 1, values: { Priority: "Q", Next: "", Label: "Two" } },
+    { index: 2, values: { Priority: "B", Next: "", Label: "Three" } },
+  ];
+  assert.deepEqual(filteredRows(rows, filterColumns, new Map([["Next", ""]])).map((row) => row.index), [1, 2]);
+  assert.deepEqual(filteredRows(rows, filterColumns, new Map([["Priority", "Q"]])).map((row) => row.index), [1]);
+  assert.deepEqual(
+    filteredRows(rows, filterColumns, new Map([["Priority", "B"], ["Next", ""]])).map((row) => row.index),
+    [2],
+  );
+});
+
+test("filter values include blank, lookups, and unknown actual values", () => {
+  const rows = [
+    { values: { Priority: "Q" } },
+    { values: { Priority: "A" } },
+    { values: { Priority: "" } },
+  ];
+  const column = { name: "Priority", type: "dropdown" };
+  const values = filterValues(rows, column, [{ value: "Z" }, { value: "A" }]);
+  assert.deepEqual(values, ["", "A", "Q", "Z"]);
+});
+
+test("filtering hides rows without removing their unsaved edits from save", () => {
+  const filterColumns = [{ name: "Priority", type: "dropdown" }, { name: "Label", type: "text" }];
+  const original = [
+    { index: 0, values: { Priority: "A", Label: "Original" } },
+    { index: 1, values: { Priority: "B", Label: "Visible" } },
+  ];
+  const rows = [
+    { index: 0, values: { Priority: "A", Label: "Hidden edit" } },
+    { index: 1, values: { Priority: "B", Label: "Visible" } },
+  ];
+  const visible = filteredRows(rows, filterColumns, new Map([["Priority", "B"]]));
+  assert.deepEqual(visible.map((row) => row.index), [1]);
+  const payload = buildSavePayload("sample", "revision", rows, original);
+  assert.deepEqual(payload.changes, [{ row: 0, values: { Label: "Hidden edit" } }]);
+});
+
+test("column widths are clamped to accessible limits", () => {
+  assert.equal(clampColumnWidth(20), 80);
+  assert.equal(clampColumnWidth(125.6), 126);
+  assert.equal(clampColumnWidth(900), 600);
 });
 
 test("textarea edits retain the selected note's original newline convention", () => {

@@ -59,6 +59,23 @@ class Application:
         repository = self.repository(repository_id if isinstance(repository_id, str) else None)
         return self.preferences.set_mode(repository.id, mode)
 
+    def set_view_preferences(self, payload: dict[str, Any]) -> dict[str, Any]:
+        repository_id = payload.get("repository")
+        repository = self.repository(repository_id if isinstance(repository_id, str) else None)
+        note_visible = payload.get("note_visible")
+        column_widths = payload.get("column_widths")
+        if not isinstance(note_visible, bool):
+            raise ValidationError("note_visible must be true or false")
+        if not isinstance(column_widths, dict):
+            raise ValidationError("column_widths must be an object")
+        schema_names = set(self.schemas[repository.id].names)
+        for name, width in column_widths.items():
+            if not isinstance(name, str) or name not in schema_names:
+                raise ValidationError(f"Unknown column in column_widths: {name!r}")
+            if not isinstance(width, int) or isinstance(width, bool) or not 80 <= width <= 600:
+                raise ValidationError(f"Width for {name} must be an integer between 80 and 600")
+        return self.preferences.set_view(repository.id, note_visible, column_widths)
+
     def load_repository(self, repository_id: str | None = None) -> dict[str, Any]:
         repository = self.repository(repository_id)
         schema = self.schemas[repository.id]
@@ -72,6 +89,7 @@ class Application:
         return {
             "repository": repository.to_dict(),
             "mode": self.preferences.mode(repository.id),
+            "view": self.preferences.view(repository.id),
             "revision": document.revision,
             "schema": schema.to_dict(),
             "lookups": lookups,

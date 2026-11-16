@@ -20,6 +20,7 @@
       <button id="reload-button" type="button" title="Reload the CSV from disk">Reload</button>
       <span class="toolbar-separator" aria-hidden="true"></span>
       <button id="mode-button" type="button">Switch to read-only</button>
+      <button id="note-toggle" type="button" aria-controls="note-panel" aria-expanded="true">Hide note editor</button>
       <button id="add-row-button" class="secondary" type="button">Add row</button>
       <button id="save-button" class="primary" type="button" disabled>Save</button>
     </div>
@@ -29,6 +30,8 @@
     <span id="mode-indicator" class="badge">Editable</span>
     <span id="dirty-indicator" class="badge dirty" hidden>Unsaved changes</span>
     <span id="status-message" role="status" aria-live="polite">Loading repositories…</span>
+    <span id="filter-count" class="filter-count">Showing 0 of 0 rows</span>
+    <button id="clear-filters" class="compact" type="button" disabled>Clear filters</button>
     <span class="keyboard-hint">Ctrl/Cmd+S to save</span>
   </section>
 
@@ -36,13 +39,14 @@
     <section class="grid-panel" aria-label="CSV records">
       <div class="grid-scroll">
         <table id="data-grid">
+          <colgroup id="grid-columns"></colgroup>
           <thead id="grid-head"></thead>
           <tbody id="grid-body"></tbody>
         </table>
       </div>
     </section>
 
-    <aside class="note-panel" aria-labelledby="note-heading">
+    <aside id="note-panel" class="note-panel" aria-labelledby="note-heading">
       <div class="note-heading-row">
         <h2 id="note-heading">Note editor</h2>
         <span id="note-mode" class="note-mode"></span>

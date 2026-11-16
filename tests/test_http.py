@@ -74,6 +74,24 @@ class HTTPServiceTests(unittest.TestCase):
     def test_unknown_interface_asset_is_404(self):
         self.request("GET", "/missing.js", expected=404)
 
+    def test_view_preferences_over_http(self):
+        view = self.request(
+            "POST",
+            "/api/preferences/view",
+            {"repository": "sample", "note_visible": False, "column_widths": {"Next": 180}},
+        )
+        self.assertFalse(view["note_visible"])
+        self.assertEqual(view["column_widths"], {"Next": 180})
+        loaded = self.request("GET", "/api/repository")
+        self.assertEqual(loaded["view"], view)
+        error = self.request(
+            "POST",
+            "/api/preferences/view",
+            {"repository": "sample", "note_visible": True, "column_widths": {"Next": 1000}},
+            expected=400,
+        )
+        self.assertEqual(error["error"]["code"], "validation_error")
+
     def test_save_mode_and_log_over_http(self):
         loaded = self.request("GET", "/api/repository")
         saved = self.request(
