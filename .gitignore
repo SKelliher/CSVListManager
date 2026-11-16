@@ -21,10 +21,12 @@ dist/
 .env.*
 !.env.example
 
-# Personal configuration and real CSV data stores
+# Personal configuration, preferences, and real CSV data stores
+/config.yaml
 /config/local.yaml
-/data/
 /local/
+/data/
+*.csv.bak
 
 # Editor and operating-system files
 .vscode/

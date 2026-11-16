@@ -1,0 +1,2 @@
+# RFC 4180 examples use CRLF; normalize the index without treating CR as whitespace errors.
+*.csv text eol=crlf whitespace=cr-at-eol

@@ -1,0 +1,8 @@
+Priority,Next,Last,Tag,Label,Detail
+A,2026-11-16,2026-11-15,home,Prepare synthetic report,"Draft summary
+Check https://example.com"
+B,,,work,"Review, synthetic notes","( ) Confirm sample values
+* Unknown lookup values remain valid"
+C,2026-11-20,,errand,Example calendar item,
+Z,2026-11-10,2026-11-12,home,Completed example,"+ Finished safely
+- This open marker is only sample text"

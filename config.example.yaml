@@ -1,0 +1,12 @@
+# Paths are resolved from this file, then from repository_root.
+repository_root: .
+preferences: local/preferences.json
+
+repositories:
+  sample:
+    name: Synthetic NextAct
+    directory: examples/nextact
+    store: nextact.csv
+    schema: schema.yaml
+    log: changes.csv
+    scripts: []

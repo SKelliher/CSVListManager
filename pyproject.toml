@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "csvlistmanager"
+version = "0.1.0"
+description = "A configurable local grid for plain CSV data stores"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [{name = "St John Kelliher"}]
+dependencies = []
+
+[project.scripts]
+csvlistmanager = "csvlistmanager.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["csvlistmanager*"]
