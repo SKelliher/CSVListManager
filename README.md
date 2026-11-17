@@ -4,25 +4,25 @@ CSVListManager is a configurable, local grid for editing plain RFC 4180 CSV data
 
 This repository contains a Python standard-library service and a dependency-free HTML/vanilla-JavaScript grid. Together they provide typed schemas, human-editable lookup files, safe explicit saves, repository preferences, stable view-only sorting, and an append-only CSV change log.
 
-## Task Manager Use Case 
+## Task Manager Use Case
 
 CSVListManager was built as a simple CSV file editor for managing lists with a predefined structure. The primary use-case is to manage a task list with the following structure:
 * Date columns for Next and Last (most recent) action on a task
-* Priority as a lookup column on with predefined values: A, B, C for active tasks, L for back-log tasks, N for notes and Z for completed tasks.
+* Priority as a lookup column on with predefined values: A, B, C for active tasks, L for backlog tasks, N for notes and Z for completed tasks.
 * Tag lookup column with predefined tags for task subject matter
 * Label as a single line descriptive text field
 * Note as a multiline cell for task notes
 
 Required features for the list manager use case include:
-* CRUD functionality (Create, Revise, Update, Delete) on tasks
+* CRUD functionality (Create, Read, Update, Delete) on tasks
 * Archiving of completed items defined through an external python script called from within CSVListManager
-* Filtering on lookup column values (e.g. for Priority = A and Next = Today)
-* Sorting on any column
+* Filtering on column values (e.g. Priority = A and Next = today's date)
+* Sorting on any column (note columns sort by presence/length only)
 * Logging of changes
 
-This task list implementation is a minimalist approach to task management. In particular, there's no nesting or linking tasks. Tasks can be grouped by label or tag as needed. The Priority value specifies what actions are in current focus, backlog or complete (similar to Kanban). Last and Next Action dates are drawn from the Getting-Things-Done (GTD) framework. The note field provides a place to store task history, requirements, plan, goal or any other relevant information. Sorting and filtering are sufficient tools to zoom-in on what needs to be worked on now or what is pending in the near futures. This structure also serves as a simple calendar, with appointments treated as tasks. 
+This task list implementation is a minimalist approach to task management. In particular, there's no nesting or linking tasks. Tasks can be grouped by label or tag as needed. The Priority value specifies what actions are in current focus, backlog or complete (similar to Kanban). Last and Next Action dates are drawn from the Getting-Things-Done (GTD) framework. The note field provides a place to store task history, requirements, plan, goal or any other relevant information. Sorting and filtering are sufficient tools to zoom-in on what needs to be worked on now or what is pending in the near future. This structure also serves as a simple calendar, with appointments treated as tasks.
 
-Other use-cases include any list management with a fixed data structure.
+Other use cases include any list management with a fixed data structure.
 
 ## Features
 
@@ -117,28 +117,6 @@ One value chosen from a list you define — either inline in the schema or from 
 - Multiple named data repositories selectable from a dropdown, configured in one YAML file
 - Schema-driven: columns, types, and lookups are configuration, not code — adapt it to any CSV without touching the source
 - Runs anywhere Python 3.11+ runs; deploy to a headless box and reach it through an SSH tunnel
-
-## Implemented
-
-- YAML application configuration and schema validation with actionable errors.
-- Multiple named data repositories and per-repository editable/read-only modes.
-- RFC 4180 parsing through Python's `csv` module, including quoted commas, quotes, empty values, and embedded newlines.
-- Field-level save patches that leave all untouched bytes, quoting, record order, and line endings unchanged.
-- Atomic temporary-file-and-replace saves and revision checks that prevent overwriting external edits.
-- New-row appends and optional `on_create`/`on_update` datetime columns.
-- Append-only cell-edit, row-addition, and save log events.
-- A localhost-only JSON HTTP API and locally served browser interface.
-- Sticky-header grid with stable ascending/descending sorting and no file reordering.
-- Exact-value date/dropdown filters with blank/unknown values, combined filtering, row counts, and clearing.
-- Draggable persisted column widths and a persisted show/hide note-editor control.
-- Native date/datetime controls, text inputs, lookup dropdowns, and a full multi-line note pane.
-- Configured external scripts run from the browser with confirmation, captured output, success/failure feedback, and an automatic reload and store re-validation afterward.
-- Per-row mark-for-deletion applied on explicit save, with undo and `row_delete` log entries.
-- A read-only in-app change-log viewer with refresh.
-- Add-row workflow, explicit Save button/shortcut, dirty indicator, and unsaved-change warnings.
-- A completely synthetic NextAct example and automated unit/HTTP/JavaScript tests.
-
-The live personal NextAct store is not connected by any shipped configuration.
 
 ## Requirements
 

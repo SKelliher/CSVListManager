@@ -2,7 +2,7 @@ columns:
   - name: Priority
     type: dropdown
     lookup:
-      values: [A, B, C, Z]
+      values: [A, B, C, L, N, Z]
   - name: Next
     type: date
   - name: Last

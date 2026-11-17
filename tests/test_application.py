@@ -27,7 +27,7 @@ class ApplicationTests(unittest.TestCase):
         loaded = self.app.load_repository("sample")
         self.assertEqual(len(loaded["rows"]), 4)
         self.assertIn("\r\n", loaded["rows"][0]["values"]["Detail"])
-        self.assertEqual([item["value"] for item in loaded["lookups"]["Priority"]], ["A", "B", "C", "Z"])
+        self.assertEqual([item["value"] for item in loaded["lookups"]["Priority"]], ["A", "B", "C", "L", "N", "Z"])
         self.assertEqual(loaded["mode"], "editable")
 
     def test_save_accepts_unknown_dropdown_value_and_appends_log(self):
