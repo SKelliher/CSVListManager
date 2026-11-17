@@ -1,6 +1,6 @@
 # CSVListManager — Implementation Plan
 
-**Status:** Active; phases 1–5 complete plus built-in row deletion (CRUD gap, 2026-11-17); go-live with the live nextact.csv and publication remain user-gated
+**Status:** Complete; all phases plus built-in row deletion are implemented and verified. The repository is public.
 **Date:** 2026-11-16
 **Updated:** 2026-11-16
 **Requirements:** `docs/nextact_grid_requirements.md`
@@ -104,4 +104,4 @@ Create a synthetic test data repository using the nextact structure but no real 
 
 ## 10. Publication gate
 
-After verification: review committed files for personal data, finalize README installation/usage instructions, confirm MIT license, then make the GitHub repository public only with your approval.
+After verification: review committed files for personal data, finalize README installation/usage instructions, confirm MIT license, then make the GitHub repository public only with your approval. **Complete 2026-11-17:** personal paths were scrubbed from all commit history, README installation instructions were added, and the repository was made public with approval.

@@ -24,7 +24,7 @@ This repository contains a Python standard-library service and a dependency-free
 - Add-row workflow, explicit Save button/shortcut, dirty indicator, and unsaved-change warnings.
 - A completely synthetic NextAct example and automated unit/HTTP/JavaScript tests.
 
-The external script runner and in-app change-log viewer are not implemented yet. The live personal NextAct store is not connected by any shipped configuration.
+The live personal NextAct store is not connected by any shipped configuration.
 
 ## Requirements
 
@@ -32,6 +32,27 @@ The external script runner and in-app change-log viewer are not implemented yet.
 - A modern browser
 - No runtime packages outside the Python standard library
 - Node.js 20 or later only for the optional JavaScript model tests
+
+## Installation
+
+CSVListManager runs directly from a source checkout: there is nothing to build and no packages to install.
+
+```sh
+git clone https://github.com/SKelliher/CSVListManager.git
+cd CSVListManager
+python3 -m csvlistmanager --config config.example.yaml --check  # validate the bundled example
+python3 -m csvlistmanager --config config.example.yaml          # start the service
+```
+
+Open <http://127.0.0.1:8765> in a browser. Stop the service with Ctrl+C.
+
+### Deploying on a fresh Linux host
+
+1. Install Python 3.11+ and Git (for example `sudo apt install python3 git` on Debian/Ubuntu).
+2. Clone the repository as above, or download and unpack the source ZIP from GitHub.
+3. Copy `config.example.yaml` to `config.yaml` (ignored by Git) and edit it to point at your own data repositories; see [Configuration](#configuration).
+4. Optionally verify the deployment: `python3 -m unittest discover -s tests`.
+5. Optionally run the service in the background: `nohup python3 -m csvlistmanager --config config.yaml --port 8765 &`. The service binds to localhost only; to reach it from another machine use an SSH tunnel such as `ssh -L 8765:127.0.0.1:8765 user@host` and open <http://127.0.0.1:8765> locally.
 
 ## Run against the synthetic example
 
@@ -121,10 +142,11 @@ The dependency-free YAML reader supports indentation-based mappings/lists, plain
 | GET | `/api/repository?repository=ID` | Load schema, lookups, rows, mode, view preferences, and revision |
 | POST | `/api/preferences/mode` | Set `editable` or `read-only` mode |
 | POST | `/api/preferences/view` | Set note visibility and per-column widths |
-| POST | `/api/save` | Atomically apply changes and append rows |
+| POST | `/api/save` | Atomically apply changes, appended rows, and deletions |
+| POST | `/api/scripts/run` | Run a configured script and re-validate the store |
 | GET | `/api/log?repository=ID&limit=500` | Read the append-only change log |
 
-A save supplies the loaded file revision, changed row indexes with only their changed values, and optional new rows:
+A save supplies the loaded file revision, changed row indexes with only their changed values, and optional new rows and deleted row indexes:
 
 ```json
 {
@@ -135,7 +157,8 @@ A save supplies the loaded file revision, changed row indexes with only their ch
   ],
   "new_rows": [
     {"Priority": "B", "Label": "New synthetic item"}
-  ]
+  ],
+  "deletions": [3]
 }
 ```
 
