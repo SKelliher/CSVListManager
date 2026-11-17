@@ -9,4 +9,7 @@ repositories:
     store: nextact.csv
     schema: schema.yaml
     log: changes.csv
-    scripts: []
+    scripts:
+      - name: archive
+        command: [python3, archive.py]
+        description: Move completed (priority Z) rows into archive.csv

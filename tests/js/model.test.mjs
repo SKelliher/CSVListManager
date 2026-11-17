@@ -8,10 +8,12 @@ import {
   editorKind,
   filteredRows,
   filterValues,
+  formatLogEntry,
   fromEditorValue,
   fromTextareaValue,
   hasUnsavedChanges,
   noteNewline,
+  scriptResultMessage,
   sortedRows,
   toEditorValue,
 } from "../../csvlistmanager/static/model.js";
@@ -142,4 +144,46 @@ test("textarea edits retain the selected note's original newline convention", ()
   const newline = noteNewline(original);
   assert.equal(newline, "\r\n");
   assert.equal(fromTextareaValue("first\nsecond\nthird", newline), "first\r\nsecond\r\nthird");
+});
+
+test("script result messages prefer the first output line on success", () => {
+  assert.equal(
+    scriptResultMessage({ script: "archive", status: "success", output: "\nArchived 1 row; 3 remain.\n" }),
+    'Script "archive" finished: Archived 1 row; 3 remain.',
+  );
+  assert.equal(
+    scriptResultMessage({ script: "archive", status: "success", output: "" }),
+    'Script "archive" completed successfully.',
+  );
+});
+
+test("script failure messages include the detail", () => {
+  assert.equal(
+    scriptResultMessage({ script: "archive", status: "failed", detail: "Exited with status 3" }),
+    'Script "archive" failed: Exited with status 3',
+  );
+});
+
+test("log entries format edits, saves, and script runs", () => {
+  assert.equal(
+    formatLogEntry({ event: "cell_edit", details: '{"row":2,"column":"Next","old":"","new":"2026-11-16"}' }),
+    'Row 3: Next changed from "" to "2026-11-16"',
+  );
+  assert.equal(
+    formatLogEntry({ event: "save", details: '{"edit_count":2,"addition_count":1}' }),
+    "Saved 2 edit(s) and 1 new row(s)",
+  );
+  assert.equal(
+    formatLogEntry({ event: "script_run", details: '{"script":"archive","status":"success","exit_code":0}' }),
+    'Script "archive" success (exit 0)',
+  );
+  assert.equal(
+    formatLogEntry({ event: "script_run", details: '{"script":"archive","status":"failed","exit_code":3,"detail":"Exited with status 3"}' }),
+    'Script "archive" failed (exit 3): Exited with status 3',
+  );
+});
+
+test("log entries survive invalid JSON details", () => {
+  assert.equal(formatLogEntry({ event: "cell_edit", details: "not json" }), "not json");
+  assert.equal(formatLogEntry({ event: "mystery", details: "raw text" }), "raw text");
 });

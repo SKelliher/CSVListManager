@@ -5,12 +5,14 @@ import {
   editorKind,
   filteredRows,
   filterValues,
+  formatLogEntry,
   fromEditorValue,
   fromTextareaValue,
   hasUnsavedChanges,
   MAX_COLUMN_WIDTH,
   MIN_COLUMN_WIDTH,
   noteNewline,
+  scriptResultMessage,
   sortedRows,
   toEditorValue,
 } from "/model.js";
@@ -22,6 +24,14 @@ const elements = {
   noteToggle: document.querySelector("#note-toggle"),
   add: document.querySelector("#add-row-button"),
   save: document.querySelector("#save-button"),
+  scriptSelect: document.querySelector("#script-select"),
+  runScript: document.querySelector("#run-script-button"),
+  logButton: document.querySelector("#log-button"),
+  logDialog: document.querySelector("#log-dialog"),
+  logSummary: document.querySelector("#log-summary"),
+  logBody: document.querySelector("#log-body"),
+  logRefresh: document.querySelector("#log-refresh"),
+  logClose: document.querySelector("#log-close"),
   modeIndicator: document.querySelector("#mode-indicator"),
   dirtyIndicator: document.querySelector("#dirty-indicator"),
   status: document.querySelector("#status-message"),
@@ -55,6 +65,7 @@ const state = {
   selectedNote: null,
   selectedNoteNewline: "\n",
   newRowCounter: 0,
+  scripts: [],
   busy: false,
   viewRequest: 0,
   viewSaveTimer: null,
@@ -114,7 +125,25 @@ function updateControls() {
   elements.modeIndicator.classList.toggle("read-only", state.mode === "read-only");
   elements.dirtyIndicator.hidden = !hasChanges;
   elements.clearFilters.disabled = state.busy || state.filters.size === 0;
+  const hasScripts = hasRepository && state.scripts.length > 0;
+  elements.scriptSelect.hidden = !hasScripts;
+  elements.runScript.hidden = !hasScripts;
+  elements.scriptSelect.disabled = state.busy || !hasScripts;
+  elements.runScript.disabled = state.busy || !hasScripts || hasChanges;
+  elements.runScript.title = hasChanges ? "Save or discard unsaved changes before running a script" : "";
+  elements.logButton.disabled = state.busy || !hasRepository;
   document.title = `${hasChanges ? "* " : ""}CSVListManager`;
+}
+
+function renderScriptOptions() {
+  elements.scriptSelect.replaceChildren();
+  for (const script of state.scripts) {
+    const option = document.createElement("option");
+    option.value = script.name;
+    option.textContent = script.description ? `${script.name} — ${script.description}` : script.name;
+    option.title = script.description || script.name;
+    elements.scriptSelect.append(option);
+  }
 }
 
 function renderRepositoryOptions() {
@@ -522,6 +551,8 @@ async function loadRepository(repositoryId) {
     state.revision = payload.revision;
     state.columns = payload.schema.columns;
     state.lookups = payload.lookups;
+    state.scripts = payload.repository.scripts || [];
+    renderScriptOptions();
     state.rows = payload.rows.map((row) => ({ key: row.index, index: row.index, values: { ...row.values }, isNew: false }));
     state.originalRows = payload.rows.map((row) => ({ index: row.index, values: { ...row.values } }));
     state.originals = new Map(state.originalRows.map((row) => [row.index, row]));
@@ -659,6 +690,79 @@ async function save() {
   }
 }
 
+async function runSelectedScript() {
+  const name = elements.scriptSelect.value;
+  const repository = state.repositoryId;
+  if (!repository || state.busy || !name || dirty()) return;
+  const script = state.scripts.find((candidate) => candidate.name === name);
+  const question = script?.description
+    ? `Run script "${name}" (${script.description}) on ${repository}?`
+    : `Run script "${name}" on ${repository}?`;
+  if (!window.confirm(question)) return;
+  state.busy = true;
+  renderAll();
+  setStatus(`Running script "${name}"…`);
+  try {
+    const result = await api("/api/scripts/run", {
+      method: "POST",
+      body: JSON.stringify({ repository, script: name }),
+    });
+    if (result.status === "success") {
+      if (await loadRepository(repository)) setStatus(scriptResultMessage(result));
+    } else {
+      state.busy = false;
+      renderAll();
+      setStatus(scriptResultMessage(result), true);
+      if (result.output) console.warn(`Script "${name}" output:\n${result.output}`);
+    }
+  } catch (error) {
+    state.busy = false;
+    renderAll();
+    setStatus(error.message, true);
+  }
+}
+
+function renderLogRows(rows) {
+  elements.logBody.replaceChildren();
+  elements.logSummary.textContent = rows.length
+    ? `${rows.length} most recent entr${rows.length === 1 ? "y" : "ies"}, newest last.`
+    : "No log entries yet.";
+  for (const row of rows) {
+    const tableRow = document.createElement("tr");
+    const time = document.createElement("td");
+    time.className = "log-time";
+    time.textContent = row.timestamp.replace("T", " ").replace(/\+00:00$/, " UTC");
+    const event = document.createElement("td");
+    event.textContent = row.event;
+    const details = document.createElement("td");
+    details.className = "log-details";
+    details.textContent = formatLogEntry(row);
+    tableRow.append(time, event, details);
+    elements.logBody.append(tableRow);
+  }
+}
+
+async function refreshLog() {
+  if (!state.repositoryId) return;
+  elements.logRefresh.disabled = true;
+  try {
+    const payload = await api(`/api/log?repository=${encodeURIComponent(state.repositoryId)}`);
+    renderLogRows(payload.rows);
+  } catch (error) {
+    elements.logSummary.textContent = error.message;
+  } finally {
+    elements.logRefresh.disabled = false;
+  }
+}
+
+function openLog() {
+  if (!state.repositoryId || state.busy) return;
+  elements.logSummary.textContent = "Loading…";
+  elements.logBody.replaceChildren();
+  elements.logDialog.showModal();
+  void refreshLog();
+}
+
 elements.repository.addEventListener("change", changeRepository);
 elements.reload.addEventListener("click", reloadRepository);
 elements.mode.addEventListener("click", toggleMode);
@@ -666,6 +770,10 @@ elements.noteToggle.addEventListener("click", toggleNoteVisibility);
 elements.clearFilters.addEventListener("click", clearFilters);
 elements.add.addEventListener("click", addRow);
 elements.save.addEventListener("click", save);
+elements.runScript.addEventListener("click", runSelectedScript);
+elements.logButton.addEventListener("click", openLog);
+elements.logRefresh.addEventListener("click", refreshLog);
+elements.logClose.addEventListener("click", () => elements.logDialog.close());
 
 elements.noteEditor.addEventListener("input", () => {
   const selected = state.selectedNote;

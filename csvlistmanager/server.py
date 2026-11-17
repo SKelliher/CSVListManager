@@ -86,6 +86,9 @@ class RequestHandler(BaseHTTPRequestHandler):
             if path == "/api/save":
                 self._json(200, app.save(payload))
                 return
+            if path == "/api/scripts/run":
+                self._json(200, app.run_script(payload.get("repository"), payload.get("script")))
+                return
         raise NotFoundError(f"No endpoint for {method} {path}")
 
     @staticmethod

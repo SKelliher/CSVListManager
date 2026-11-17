@@ -128,3 +128,42 @@ export function noteNewline(value) {
 export function fromTextareaValue(value, newline) {
   return value.replace(/\r\n|\r|\n/g, newline);
 }
+
+export function scriptResultMessage(result) {
+  const name = result.script || "script";
+  if (result.status === "success") {
+    const firstLine = (result.output || "").split(/\r\n|\r|\n/).find((line) => line.trim());
+    return firstLine ? `Script "${name}" finished: ${firstLine}` : `Script "${name}" completed successfully.`;
+  }
+  const detail = result.detail || "unknown error";
+  return `Script "${name}" failed: ${detail}`;
+}
+
+export function parseLogDetails(row) {
+  try {
+    const parsed = JSON.parse(row.details || "{}");
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+export function formatLogEntry(row) {
+  const details = parseLogDetails(row);
+  if (details === null) return row.details || "";
+  switch (row.event) {
+    case "cell_edit":
+      return `Row ${(details.row ?? 0) + 1}: ${details.column} changed from "${details.old ?? ""}" to "${details.new ?? ""}"`;
+    case "row_add":
+      return `Row ${(details.row ?? 0) + 1} added`;
+    case "save":
+      return `Saved ${details.edit_count ?? 0} edit(s) and ${details.addition_count ?? 0} new row(s)`;
+    case "script_run": {
+      const base = `Script "${details.script ?? "?"}" ${details.status ?? "unknown"}`;
+      const code = details.exit_code === null || details.exit_code === undefined ? "" : ` (exit ${details.exit_code})`;
+      return details.detail ? `${base}${code}: ${details.detail}` : `${base}${code}`;
+    }
+    default:
+      return row.details || "";
+  }
+}

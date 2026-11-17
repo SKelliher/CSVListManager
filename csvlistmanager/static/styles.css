@@ -555,6 +555,86 @@ noscript {
   }
 }
 
+.log-dialog {
+  width: min(760px, 92vw);
+  max-height: 80vh;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 20px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow, 0 8px 24px rgba(0, 0, 0, 0.25));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.log-dialog:not([open]) {
+  display: none;
+}
+
+.log-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.log-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.log-heading-row h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.log-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.log-summary {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.log-scroll {
+  overflow: auto;
+  min-height: 120px;
+}
+
+#log-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.85rem;
+}
+
+#log-table th,
+#log-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+#log-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+}
+
+.log-time {
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.log-details {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;

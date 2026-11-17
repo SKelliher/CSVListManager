@@ -23,6 +23,11 @@
       <button id="note-toggle" type="button" aria-controls="note-panel" aria-expanded="true">Hide note editor</button>
       <button id="add-row-button" class="secondary" type="button">Add row</button>
       <button id="save-button" class="primary" type="button" disabled>Save</button>
+      <span class="toolbar-separator" aria-hidden="true"></span>
+      <label class="control-label" for="script-select">Script</label>
+      <select id="script-select" aria-label="Configured script"></select>
+      <button id="run-script-button" type="button">Run script</button>
+      <button id="log-button" type="button" aria-haspopup="dialog">View log</button>
     </div>
   </header>
 
@@ -56,6 +61,25 @@
       <p class="note-help">Notes preserve embedded newlines. Select any note cell even in read-only mode.</p>
     </aside>
   </main>
+
+  <dialog id="log-dialog" class="log-dialog" aria-labelledby="log-heading">
+    <div class="log-heading-row">
+      <h2 id="log-heading">Change log</h2>
+      <div class="log-actions">
+        <button id="log-refresh" class="compact" type="button">Refresh</button>
+        <button id="log-close" class="compact" type="button">Close</button>
+      </div>
+    </div>
+    <p id="log-summary" class="log-summary">Loading…</p>
+    <div class="log-scroll">
+      <table id="log-table">
+        <thead>
+          <tr><th scope="col">Time</th><th scope="col">Event</th><th scope="col">Details</th></tr>
+        </thead>
+        <tbody id="log-body"></tbody>
+      </table>
+    </div>
+  </dialog>
 
   <noscript>CSVListManager requires JavaScript for its local editing interface.</noscript>
 </body>

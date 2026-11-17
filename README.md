@@ -18,6 +18,8 @@ This repository contains a Python standard-library service and a dependency-free
 - Exact-value date/dropdown filters with blank/unknown values, combined filtering, row counts, and clearing.
 - Draggable persisted column widths and a persisted show/hide note-editor control.
 - Native date/datetime controls, text inputs, lookup dropdowns, and a full multi-line note pane.
+- Configured external scripts run from the browser with confirmation, captured output, success/failure feedback, and an automatic reload and store re-validation afterward.
+- A read-only in-app change-log viewer with refresh.
 - Add-row workflow, explicit Save button/shortcut, dirty indicator, and unsaved-change warnings.
 - A completely synthetic NextAct example and automated unit/HTTP/JavaScript tests.
 
@@ -71,7 +73,10 @@ repositories:
     store: nextact.csv
     schema: schema.yaml
     log: changes.csv
-    scripts: []
+    scripts:
+      - name: archive
+        command: [python3, archive.py]
+        description: Move completed (priority Z) rows into archive.csv
 ```
 
 The repository root is resolved relative to the configuration file. Store, schema, log, and lookup paths must remain inside their configured repository directory. All repositories, stores, schemas, and lookups are validated at startup; invalid user data is not modified.
@@ -98,6 +103,10 @@ columns:
 ```
 
 Adding, removing, renaming, or reordering columns requires only schema and corresponding CSV header changes. Values outside a dropdown lookup are preserved and displayed; validation does not police existing data.
+
+## Scripts
+
+Scripts are configured external commands listed per repository. The service runs them from the repository directory, supplies `CSVLIST_REPOSITORY_DIR`, `CSVLIST_STORE`, and `CSVLIST_LOG` environment variables, captures output and exit status, appends a `script_run` entry to the change log, and reloads and re-validates the store afterward. A non-zero exit, a launch failure, a timeout, or a store that no longer loads is reported as a visible failure, never as success. Scripts own their domain logic and must perform their own atomic data transformations; see `examples/nextact/archive.py` for a working example. The browser **Run script** control asks for confirmation, is disabled while unsaved changes are pending, and reloads the grid after a successful run.
 
 The dependency-free YAML reader supports indentation-based mappings/lists, plain and quoted scalars, and flow lists/mappings. It intentionally rejects unsupported features such as block scalars with a source line number rather than guessing.
 
@@ -144,7 +153,7 @@ python3 -m unittest discover -s tests -v
 node --test tests/js/*.test.mjs
 ```
 
-Tests copy the dedicated synthetic fixture from `tests/fixtures/nextact` into temporary directories, so local edits to the runnable example do not affect test results. Python coverage includes byte-identical no-op round trips, exact field-level edits, embedded newlines, managed timestamps, appended rows, schema changes, read-only enforcement, external-edit conflicts, logging, view-preference validation/persistence, static assets, and live localhost HTTP requests. JavaScript model tests cover stable sorting, exact and combined filters, blank/unknown filter values, file-order preservation, saving filtered-out edits, width limits, minimal save payloads, appended-row order, native editor fallback, and note newline preservation.
+Tests copy the dedicated synthetic fixture from `tests/fixtures/nextact` into temporary directories, so local edits to the runnable example do not affect test results. Python coverage includes byte-identical no-op round trips, exact field-level edits, embedded newlines, managed timestamps, appended rows, schema changes, read-only enforcement, external-edit conflicts, logging, view-preference validation/persistence, script success/failure/corruption handling, script-run log entries, static assets, and live localhost HTTP requests. JavaScript model tests cover stable sorting, exact and combined filters, blank/unknown filter values, file-order preservation, saving filtered-out edits, width limits, minimal save payloads, appended-row order, native editor fallback, note newline preservation, script result messages, and log entry formatting.
 
 ## License
 

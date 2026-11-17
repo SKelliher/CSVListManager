@@ -9,8 +9,9 @@ from typing import Any
 from .changelog import ChangeLog
 from .config import AppConfig, Repository, load_config, load_schema, read_lookup
 from .csvfile import CSVDocument, atomic_replace
-from .errors import ConflictError, NotFoundError, ReadOnlyError, ValidationError
+from .errors import ConflictError, CSVListManagerError, NotFoundError, ReadOnlyError, ValidationError
 from .preferences import PreferenceStore
+from .scripts import execute
 
 
 class Application:
@@ -139,6 +140,35 @@ class Application:
                 "additions": len(plan.additions),
                 "changed": True,
             }
+
+    def run_script(self, repository_id: Any, script_name: Any) -> dict[str, Any]:
+        with self._lock:
+            repository = self.repository(repository_id if isinstance(repository_id, str) else None)
+            if not isinstance(script_name, str):
+                raise ValidationError("script must be a string")
+            script = next((candidate for candidate in repository.scripts if candidate.name == script_name), None)
+            if script is None:
+                raise NotFoundError(f"Repository {repository.id} has no script {script_name!r}")
+            log = ChangeLog(repository.log, repository.id)
+            outcome = execute(repository, script)
+            log.append_many([("script_run", outcome.to_dict(script))])
+            if outcome.status != "success":
+                return {"repository": repository.to_dict(), **outcome.to_dict(script)}
+            try:
+                document = CSVDocument.load(repository.store)
+                document.validate_header(self.schemas[repository.id])
+            except CSVListManagerError as error:
+                detail = f"The script reported success but the store no longer loads: {error.message}"
+                log.append_many([("script_run", {"script": script.name, "status": "failed", "exit_code": outcome.exit_code, "output": outcome.output, "detail": detail})])
+                return {
+                    "repository": repository.to_dict(),
+                    "script": script.name,
+                    "status": "failed",
+                    "exit_code": outcome.exit_code,
+                    "output": outcome.output,
+                    "detail": detail,
+                }
+            return {"repository": repository.to_dict(), **outcome.to_dict(script), "revision": document.revision}
 
     def read_log(self, repository_id: str | None, limit: Any = 500) -> dict[str, Any]:
         repository = self.repository(repository_id)

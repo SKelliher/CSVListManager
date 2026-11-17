@@ -118,6 +118,22 @@ class HTTPServiceTests(unittest.TestCase):
         )
         self.assertEqual(error["error"]["code"], "read_only")
 
+    def test_script_run_and_log_over_http(self):
+        loaded = self.request("GET", "/api/repository")
+        self.assertEqual(loaded["repository"]["scripts"][0]["name"], "archive")
+        result = self.request("POST", "/api/scripts/run", {"repository": "sample", "script": "archive"})
+        self.assertEqual(result["status"], "success")
+        reloaded = self.request("GET", "/api/repository?repository=sample")
+        self.assertEqual(reloaded["revision"], result["revision"])
+        self.assertEqual(len(reloaded["rows"]), 3)
+        log = self.request("GET", "/api/log")
+        self.assertEqual(log["rows"][-1]["event"], "script_run")
+        self.assertIn('"status":"success"', log["rows"][-1]["details"])
+
+    def test_unknown_script_is_404(self):
+        error = self.request("POST", "/api/scripts/run", {"script": "nope"}, expected=404)
+        self.assertEqual(error["error"]["code"], "not_found")
+
     def test_unknown_repository_is_404(self):
         error = self.request("GET", "/api/repository?repository=missing", expected=404)
         self.assertEqual(error["error"]["code"], "not_found")

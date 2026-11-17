@@ -1,6 +1,6 @@
 # CSVListManager — Implementation Plan
 
-**Status:** Active; phases 1–4 complete, script runner and change-log viewer are the next phase
+**Status:** Active; phases 1–5 complete, synthetic test repository hardening and final verification are the next phase
 **Date:** 2026-11-16
 **Updated:** 2026-11-16
 **Requirements:** `docs/nextact_grid_requirements.md`
@@ -95,7 +95,7 @@ Create a synthetic test data repository using the nextact structure but no real 
 2. Implement Python service and configuration parsing. **Complete.**
 3. Implement browser grid and editing modes. **Complete.**
 4. Implement note-panel visibility, adjustable column widths, and exact-value date/dropdown filters with UI/model tests. **Complete.**
-5. Implement script runner and change-log viewer. **Next.**
+5. Implement script runner and change-log viewer. **Complete.**
 6. Add synthetic test repository and automated tests.
 7. Run tests, start the service, exercise the UI against the test repository, and diff files after saves.
 8. Report actual results. Do not switch the live `nextact.csv` to the tool until the test-repository success tests pass.
