@@ -461,10 +461,30 @@ function renderGrid() {
   for (const record of visibleRows) {
     const tableRow = document.createElement("tr");
     tableRow.classList.toggle("new-row", record.isNew);
+    tableRow.classList.toggle("deleted-row", Boolean(record.isDeleted));
     const number = document.createElement("th");
     number.className = "row-number";
     number.scope = "row";
-    number.textContent = record.isNew ? "New" : String(record.index + 1);
+    const numberLabel = document.createElement("span");
+    numberLabel.textContent = record.isNew ? "New" : String(record.index + 1);
+    number.append(numberLabel);
+    if (state.mode !== "read-only") {
+      const deleteButton = document.createElement("button");
+      deleteButton.type = "button";
+      deleteButton.className = "row-delete";
+      deleteButton.dataset.rowKey = record.key;
+      deleteButton.disabled = state.busy;
+      deleteButton.textContent = record.isNew ? "✕" : record.isDeleted ? "↩" : "✕";
+      deleteButton.title = record.isNew
+        ? "Discard this unsaved row"
+        : record.isDeleted
+          ? "Keep this row (undo delete)"
+          : "Mark this row for deletion on save";
+      deleteButton.setAttribute("aria-label", deleteButton.title);
+      deleteButton.setAttribute("aria-pressed", String(Boolean(record.isDeleted)));
+      deleteButton.addEventListener("click", () => toggleRowDeletion(record));
+      number.append(deleteButton);
+    }
     tableRow.append(number);
 
     for (const column of state.columns) {
@@ -473,9 +493,10 @@ function renderGrid() {
       let editor;
       if (column.type === "note") {
         editor = createNoteButton(record, column);
+        if (record.isDeleted) editor.disabled = true;
       } else {
         const managed = column.on_create || column.on_update;
-        const disabled = state.busy || state.mode === "read-only" || managed;
+        const disabled = state.busy || state.mode === "read-only" || managed || Boolean(record.isDeleted);
         editor = column.type === "dropdown"
           ? createDropdown(record, column, disabled)
           : createInput(record, column, disabled);
@@ -487,6 +508,25 @@ function renderGrid() {
     }
     elements.body.append(tableRow);
   }
+}
+
+function toggleRowDeletion(record) {
+  if (state.busy || state.mode === "read-only") return;
+  if (record.isNew) {
+    state.rows = state.rows.filter((row) => row !== record);
+    if (state.selectedNote?.key === record.key) state.selectedNote = null;
+    renderAll();
+    setStatus("Unsaved new row discarded.");
+    return;
+  }
+  record.isDeleted = !record.isDeleted;
+  if (record.isDeleted && state.selectedNote?.key === record.key) state.selectedNote = null;
+  renderAll();
+  setStatus(
+    record.isDeleted
+      ? `${rowLabel(record)} is marked for deletion. Save to apply it.`
+      : `${rowLabel(record)} will be kept.`,
+  );
 }
 
 function selectNote(row, column) {
@@ -677,7 +717,7 @@ async function save() {
   setStatus("Saving…");
   try {
     const result = await api("/api/save", { method: "POST", body: JSON.stringify(payload) });
-    const message = `Saved ${result.edits} edit${result.edits === 1 ? "" : "s"} and ${result.additions} new row${result.additions === 1 ? "" : "s"}.`;
+    const message = `Saved ${result.edits} edit${result.edits === 1 ? "" : "s"}, ${result.additions} new row${result.additions === 1 ? "" : "s"}, ${result.deletions ?? 0} deletion${(result.deletions ?? 0) === 1 ? "" : "s"}.`;
     if (await loadRepository(repository)) setStatus(message);
   } catch (error) {
     state.busy = false;

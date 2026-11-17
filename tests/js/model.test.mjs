@@ -37,6 +37,21 @@ test("save payload contains only changed fields", () => {
   assert.equal(hasUnsavedChanges(rows, original), false);
 });
 
+test("deletions are collected, skip edits, and count as unsaved changes", () => {
+  const original = [row(0, "Alpha"), row(1, "Beta"), row(2, "Gamma")];
+  const rows = [row(0, "Alpha"), { ...row(1, "Beta changed"), isDeleted: true }, row(2, "Gamma")];
+  assert.equal(hasUnsavedChanges(rows, original), true);
+  const payload = buildSavePayload("sample", "revision", rows, original);
+  assert.deepEqual(payload.deletions, [1]);
+  assert.deepEqual(payload.changes, []); // edits on a deleted row are not sent
+});
+
+test("new rows are never reported as deletions", () => {
+  const original = [row(0, "Alpha")];
+  const rows = [row(0, "Alpha"), { key: "new-1", index: null, values: { Label: "Draft" }, isNew: true }];
+  assert.deepEqual(buildSavePayload("sample", "revision", rows, original).deletions, []);
+});
+
 test("new rows retain file order and append after existing changes", () => {
   const original = [row(0, "Alpha")];
   const rows = [
@@ -53,6 +68,7 @@ test("new rows retain file order and append after existing changes", () => {
       { Label: "First new", Next: "", Detail: "" },
       { Label: "Second new", Next: "", Detail: "" },
     ],
+    deletions: [],
   });
 });
 
@@ -170,8 +186,12 @@ test("log entries format edits, saves, and script runs", () => {
     'Row 3: Next changed from "" to "2026-11-16"',
   );
   assert.equal(
-    formatLogEntry({ event: "save", details: '{"edit_count":2,"addition_count":1}' }),
-    "Saved 2 edit(s) and 1 new row(s)",
+    formatLogEntry({ event: "save", details: '{"edit_count":2,"addition_count":1,"deletion_count":1}' }),
+    "Saved 2 edit(s), 1 new row(s), 1 deletion(s)",
+  );
+  assert.equal(
+    formatLogEntry({ event: "row_delete", details: '{"row":2}' }),
+    "Row 3 deleted",
   );
   assert.equal(
     formatLogEntry({ event: "script_run", details: '{"script":"archive","status":"success","exit_code":0}' }),

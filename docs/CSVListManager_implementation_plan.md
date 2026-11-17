@@ -1,6 +1,6 @@
 # CSVListManager — Implementation Plan
 
-**Status:** Active; phases 1–5 complete, synthetic test repository hardening and final verification are the next phase
+**Status:** Active; phases 1–5 complete plus built-in row deletion (CRUD gap, 2026-11-17); go-live with the live nextact.csv and publication remain user-gated
 **Date:** 2026-11-16
 **Updated:** 2026-11-16
 **Requirements:** `docs/nextact_grid_requirements.md`
@@ -35,6 +35,8 @@ Each repository directory contains:
 - lookup CSVs where needed;
 - an append-only CSV change log;
 - an archive CSV where configured by a script.
+
+Row deletion is a built-in editing operation (added 2026-11-17 after a CRUD gap review): rows are marked for deletion in the browser and removed only on explicit save, logged as `row_delete`. Archive semantics remain script-based.
 
 Schema columns define `name`, `type` (`date`, `datetime`, `dropdown`, `text`, `note`), optional lookup source, and optional `on_create`/`on_update` managed flags for datetime columns. Validate configuration at startup; report actionable errors rather than modifying user files.
 

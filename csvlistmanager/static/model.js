@@ -2,7 +2,7 @@ export function collectChanges(rows, originalRows) {
   const originals = new Map(originalRows.map((row) => [row.index, row]));
   const changes = [];
   for (const row of rows) {
-    if (row.isNew) continue;
+    if (row.isNew || row.isDeleted) continue;
     const original = originals.get(row.index);
     if (!original) throw new Error(`No original row for index ${row.index}`);
     const values = {};
@@ -18,8 +18,16 @@ export function collectNewRows(rows) {
   return rows.filter((row) => row.isNew).map((row) => ({ ...row.values }));
 }
 
+export function collectDeletions(rows) {
+  return rows.filter((row) => row.isDeleted && !row.isNew).map((row) => row.index);
+}
+
 export function hasUnsavedChanges(rows, originalRows) {
-  return collectNewRows(rows).length > 0 || collectChanges(rows, originalRows).length > 0;
+  return (
+    collectNewRows(rows).length > 0
+    || collectDeletions(rows).length > 0
+    || collectChanges(rows, originalRows).length > 0
+  );
 }
 
 export function buildSavePayload(repository, revision, rows, originalRows) {
@@ -28,6 +36,7 @@ export function buildSavePayload(repository, revision, rows, originalRows) {
     revision,
     changes: collectChanges(rows, originalRows),
     new_rows: collectNewRows(rows),
+    deletions: collectDeletions(rows),
   };
 }
 
@@ -156,8 +165,10 @@ export function formatLogEntry(row) {
       return `Row ${(details.row ?? 0) + 1}: ${details.column} changed from "${details.old ?? ""}" to "${details.new ?? ""}"`;
     case "row_add":
       return `Row ${(details.row ?? 0) + 1} added`;
+    case "row_delete":
+      return `Row ${(details.row ?? 0) + 1} deleted`;
     case "save":
-      return `Saved ${details.edit_count ?? 0} edit(s) and ${details.addition_count ?? 0} new row(s)`;
+      return `Saved ${details.edit_count ?? 0} edit(s), ${details.addition_count ?? 0} new row(s), ${details.deletion_count ?? 0} deletion(s)`;
     case "script_run": {
       const base = `Script "${details.script ?? "?"}" ${details.status ?? "unknown"}`;
       const code = details.exit_code === null || details.exit_code === undefined ? "" : ` (exit ${details.exit_code})`;

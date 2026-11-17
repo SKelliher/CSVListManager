@@ -37,10 +37,11 @@ class SavePlan:
     revision: str
     edits: list[dict[str, Any]]
     additions: list[dict[str, Any]]
+    deletions: list[dict[str, Any]]
 
     @property
     def changed(self) -> bool:
-        return bool(self.edits or self.additions)
+        return bool(self.edits or self.additions or self.deletions)
 
 
 @dataclass(frozen=True)
@@ -126,11 +127,22 @@ class CSVDocument:
         schema: Schema,
         changes: list[dict[str, Any]],
         new_rows: list[dict[str, Any]],
+        deletions: list[int] | None = None,
         now: datetime | None = None,
     ) -> SavePlan:
         self.validate_header(schema)
-        if not isinstance(changes, list) or not isinstance(new_rows, list):
-            raise ValidationError("changes and new_rows must be lists")
+        deletions = deletions if deletions is not None else []
+        if not isinstance(changes, list) or not isinstance(new_rows, list) or not isinstance(deletions, list):
+            raise ValidationError("changes, new_rows, and deletions must be lists")
+        deleted_indexes: set[int] = set()
+        for deletion in deletions:
+            if not isinstance(deletion, int) or isinstance(deletion, bool):
+                raise ValidationError("Each deletion needs an integer row index")
+            if deletion < 0 or deletion >= len(self.records):
+                raise ValidationError(f"Deletion row index {deletion} is out of range")
+            if deletion in deleted_indexes:
+                raise ValidationError(f"Row {deletion} is deleted more than once")
+            deleted_indexes.add(deletion)
         timestamp = (now or datetime.now()).strftime("%Y-%m-%d %H:%M")
         positions = {column.name: index for index, column in enumerate(schema.columns)}
         created = {column.name for column in schema.columns if column.on_create}
@@ -145,6 +157,8 @@ class CSVDocument:
             row_index = change["row"]
             if row_index < 0 or row_index >= len(self.records):
                 raise ValidationError(f"Row index {row_index} is out of range")
+            if row_index in deleted_indexes:
+                raise ValidationError(f"Row {row_index} is marked for deletion; remove the deletion before editing it")
             if row_index in seen_rows:
                 raise ValidationError(f"Row {row_index} appears in more than one change")
             seen_rows.add(row_index)
@@ -177,23 +191,27 @@ class CSVDocument:
                         edits.append({"row": row_index, "column": name, "old": current, "new": timestamp, "managed": True})
             replacements[row_index] = row_replacements
 
-        text = self.text
-        for row_index in sorted(replacements, reverse=True):
-            row_replacements = replacements[row_index]
-            if not row_replacements:
+        # Reassemble the store record by record: deleted rows drop out, edited
+        # rows are rebuilt from their original spans, and every untouched byte
+        # (quoting, line endings, order) is preserved.
+        body_start = self.records[0].start if self.records else self.header.end
+        pieces = [self.text[:body_start]]
+        for row_index, record in enumerate(self.records):
+            if row_index in deleted_indexes:
                 continue
-            record = self.records[row_index]
-            raw_record = text[record.start : record.content_end]
-            for position in sorted(row_replacements, reverse=True):
+            raw_record = self.text[record.start : record.content_end]
+            for position in sorted(replacements.get(row_index, {}), reverse=True):
                 start, end = record.field_spans[position]
-                relative_start = start - record.start
-                relative_end = end - record.start
                 raw_record = (
-                    raw_record[:relative_start]
-                    + _field(row_replacements[position])
-                    + raw_record[relative_end:]
+                    raw_record[: start - record.start]
+                    + _field(replacements[row_index][position])
+                    + raw_record[end - record.start :]
                 )
-            text = text[: record.start] + raw_record + text[record.content_end :]
+            pieces.append(raw_record)
+            pieces.append(self.text[record.content_end : record.end])
+        tail_start = self.records[-1].end if self.records else self.header.end
+        pieces.append(self.text[tail_start:])
+        text = "".join(pieces)
 
         additions: list[dict[str, Any]] = []
         serialized_rows: list[str] = []
@@ -211,17 +229,21 @@ class CSVDocument:
             for name in created | updated:
                 row_values[positions[name]] = timestamp
             serialized_rows.append(_row(row_values, self.newline))
-            additions.append({"row": len(self.records) + offset, "values": dict(zip(schema.names, row_values))})
+            additions.append({"row": len(self.records) - len(deleted_indexes) + offset, "values": dict(zip(schema.names, row_values))})
 
         if serialized_rows:
-            separator = "" if not text or self.has_final_newline else self.newline
-            suffix = self.newline if self.has_final_newline or not text else ""
+            separator = "" if not text or text.endswith(("\r", "\n")) else self.newline
+            suffix = self.newline if text.endswith(("\r", "\n")) or not text else ""
             text = text + separator + self.newline.join(serialized_rows) + suffix
 
-        if not edits and not additions:
-            return SavePlan(self.data, self.revision, [], [])
+        deletion_entries = [
+            {"row": row_index, "values": dict(zip(schema.names, self.records[row_index].values))}
+            for row_index in sorted(deleted_indexes)
+        ]
+        if not edits and not additions and not deletion_entries:
+            return SavePlan(self.data, self.revision, [], [], [])
         data = text.encode("utf-8")
-        return SavePlan(data, revision_of(data), edits, additions)
+        return SavePlan(data, revision_of(data), edits, additions, deletion_entries)
 
 
 def _records(text: str) -> list[Record]:

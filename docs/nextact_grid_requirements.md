@@ -172,6 +172,7 @@ Markers are user convention, not enforced structure. The tool must **preserve th
 2. ~~Auto-bump column (R7)~~ — settled: no auto-bump of user columns. Instead, `datetime` is a generic field type (3.2) and optional per-column managed flags (`on_create`, `on_update`, 3.2.1) implement `Created`/`Updated`; `Last` in the nextact instance is a plain user-managed "Last Action" date with no tool logic {Q2}.
 3. ~~Sort persistence (R10)~~ — settled: sorting is view-only and never rewrites the file; new entries append at the bottom {Q3}.
 4. ~~Archive as built-in action~~ — settled: archiving is one instance of the generic script interface (R9); archive logic lives outside the application {Q4}.
+4a. ~~Row deletion~~ — settled 2026-11-17: CRUD was a requirements gap. Deleting rows is a generic tool editing capability, unlike archive semantics: rows are marked for deletion in the grid and removed on the next explicit Save, logged as `row_delete`. Archive remains script-based (R9) {gap review}.
 5. ~~Tag lookup location~~ — settled: repositories have a configurable default directory; multiple repositories are picked from a dropdown at startup {Q5, Q7}.
 6. ~~Architecture~~ — settled: Option B, HTML grid + Python service {Q6}.
 7. **Repository for testing:** a new test repository (clone of nextact.csv structure) is part of the success test {§10}.

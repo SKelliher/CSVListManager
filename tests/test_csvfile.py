@@ -73,7 +73,7 @@ class CSVDocumentTests(unittest.TestCase):
             schema,
             [{"row": 0, "values": {"Name": "Changed"}}],
             [{"Name": "New", "Created": "ignored", "Updated": "ignored"}],
-            now,
+            now=now,
         )
         self.assertEqual(
             plan.data,
@@ -97,6 +97,59 @@ class CSVDocumentTests(unittest.TestCase):
     def test_malformed_row_width_is_actionable(self):
         with self.assertRaisesRegex(ValidationError, "expected 3"):
             self.parse(b"Name,When,Note\nOnly,Two\n")
+
+    def test_deletion_removes_only_that_records_bytes(self):
+        raw = (
+            b'Name,When,Note\r\n'
+            b'"Alpha, one",2026-01-01,"line 1\r\nline ""2"""\r\n'
+            b'Beta,2026-01-03,unchanged\r\n'
+            b'Gamma,,\r\n'
+        )
+        document = self.parse(raw)
+        plan = document.build_save(SCHEMA, [], [], [1])
+        self.assertTrue(plan.changed)
+        self.assertEqual(plan.deletions, [{"row": 1, "values": {"Name": "Beta", "When": "2026-01-03", "Note": "unchanged"}}])
+        self.assertEqual(
+            plan.data,
+            b'Name,When,Note\r\n"Alpha, one",2026-01-01,"line 1\r\nline ""2"""\r\nGamma,,\r\n',
+        )
+
+    def test_deleting_first_last_and_all_rows(self):
+        raw = b"Name,When,Note\nAlpha,,\nBeta,,\nGamma,,\n"
+        first = self.parse(raw).build_save(SCHEMA, [], [], [0])
+        self.assertEqual(first.data, b"Name,When,Note\nBeta,,\nGamma,,\n")
+        last = self.parse(raw).build_save(SCHEMA, [], [], [2])
+        self.assertEqual(last.data, b"Name,When,Note\nAlpha,,\nBeta,,\n")
+        everything = self.parse(raw).build_save(SCHEMA, [], [], [0, 1, 2])
+        self.assertEqual(everything.data, b"Name,When,Note\n")
+
+    def test_deletion_without_trailing_newline(self):
+        raw = b"Name,When,Note\nAlpha,,\nBeta,,"
+        plan = self.parse(raw).build_save(SCHEMA, [], [], [1])
+        self.assertEqual(plan.data, b"Name,When,Note\nAlpha,,\n")
+
+    def test_deletion_combines_with_edits_and_additions(self):
+        raw = b"Name,When,Note\nAlpha,,old\nBeta,,\n"
+        plan = self.parse(raw).build_save(
+            SCHEMA,
+            [{"row": 1, "values": {"Note": "edited"}}],
+            [{"Name": "New", "When": "", "Note": ""}],
+            [0],
+        )
+        self.assertEqual(plan.data, b"Name,When,Note\nBeta,,edited\nNew,,\n")
+        self.assertEqual(plan.additions[0]["row"], 1)  # index in the saved file
+        self.assertEqual(len(plan.deletions), 1)
+
+    def test_deletion_validation(self):
+        document = self.parse(b"Name,When,Note\nAlpha,,\n")
+        with self.assertRaisesRegex(ValidationError, "out of range"):
+            document.build_save(SCHEMA, [], [], [1])
+        with self.assertRaisesRegex(ValidationError, "more than once"):
+            document.build_save(SCHEMA, [], [], [0, 0])
+        with self.assertRaisesRegex(ValidationError, "marked for deletion"):
+            document.build_save(SCHEMA, [{"row": 0, "values": {"Note": "x"}}], [], [0])
+        with self.assertRaisesRegex(ValidationError, "integer row index"):
+            document.build_save(SCHEMA, [], [], ["0"])
 
 
 if __name__ == "__main__":

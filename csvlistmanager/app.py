@@ -113,15 +113,17 @@ class Application:
                 self.schemas[repository.id],
                 payload.get("changes", []),
                 payload.get("new_rows", []),
+                payload.get("deletions", []),
             )
             if not plan.changed:
-                return {"revision": document.revision, "edits": 0, "additions": 0, "changed": False}
+                return {"revision": document.revision, "edits": 0, "additions": 0, "deletions": 0, "changed": False}
             try:
                 atomic_replace(repository.store, plan.data)
             except OSError as error:
                 raise ValidationError(f"Could not save {repository.store}: {error.strerror or error}") from error
             entries = [("cell_edit", edit) for edit in plan.edits]
             entries.extend(("row_add", addition) for addition in plan.additions)
+            entries.extend(("row_delete", deletion) for deletion in plan.deletions)
             entries.append(
                 (
                     "save",
@@ -130,6 +132,7 @@ class Application:
                         "revision": plan.revision,
                         "edit_count": len(plan.edits),
                         "addition_count": len(plan.additions),
+                        "deletion_count": len(plan.deletions),
                     },
                 )
             )
@@ -138,6 +141,7 @@ class Application:
                 "revision": plan.revision,
                 "edits": len(plan.edits),
                 "additions": len(plan.additions),
+                "deletions": len(plan.deletions),
                 "changed": True,
             }
 

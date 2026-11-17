@@ -453,6 +453,54 @@ tr.new-row .row-number {
   font-weight: 700;
 }
 
+#data-grid .row-number span {
+  display: inline-block;
+}
+
+.row-delete {
+  display: inline-block;
+  margin-left: 0.3rem;
+  padding: 0 0.25rem;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.7rem;
+  line-height: 1.4;
+  cursor: pointer;
+  opacity: 0;
+}
+
+tr:hover .row-delete,
+.row-delete:focus-visible,
+.row-delete[aria-pressed="true"] {
+  opacity: 1;
+}
+
+.row-delete:hover:not(:disabled) {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.row-delete[aria-pressed="true"] {
+  color: var(--warning);
+}
+
+tr.deleted-row td {
+  opacity: 0.55;
+}
+
+tr.deleted-row .cell-input,
+tr.deleted-row .cell-select,
+tr.deleted-row .note-cell {
+  text-decoration: line-through;
+}
+
+tr.deleted-row .row-number span {
+  color: var(--danger);
+  text-decoration: line-through;
+}
+
 .empty-row {
   padding: 2rem !important;
   color: var(--muted);

@@ -118,6 +118,34 @@ class HTTPServiceTests(unittest.TestCase):
         )
         self.assertEqual(error["error"]["code"], "read_only")
 
+    def test_save_with_deletion_over_http(self):
+        loaded = self.request("GET", "/api/repository")
+        row_count = len(loaded["rows"])
+        saved = self.request(
+            "POST",
+            "/api/save",
+            {"revision": loaded["revision"], "deletions": [1]},
+        )
+        self.assertEqual(saved["deletions"], 1)
+        reloaded = self.request("GET", "/api/repository")
+        self.assertEqual(len(reloaded["rows"]), row_count - 1)
+        labels = [row["values"]["Label"] for row in reloaded["rows"]]
+        self.assertNotIn("Review, synthetic notes", labels)
+        log = self.request("GET", "/api/log")
+        events = [row["event"] for row in log["rows"]]
+        self.assertEqual(events, ["row_delete", "save"])
+        self.assertIn('"deletion_count":1', log["rows"][-1]["details"])
+
+    def test_save_deletion_validation_over_http(self):
+        loaded = self.request("GET", "/api/repository")
+        error = self.request(
+            "POST",
+            "/api/save",
+            {"revision": loaded["revision"], "changes": [{"row": 0, "values": {"Label": "x"}}], "deletions": [0]},
+            expected=400,
+        )
+        self.assertIn("marked for deletion", error["error"]["message"])
+
     def test_script_run_and_log_over_http(self):
         loaded = self.request("GET", "/api/repository")
         self.assertEqual(loaded["repository"]["scripts"][0]["name"], "archive")

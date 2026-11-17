@@ -19,6 +19,7 @@ This repository contains a Python standard-library service and a dependency-free
 - Draggable persisted column widths and a persisted show/hide note-editor control.
 - Native date/datetime controls, text inputs, lookup dropdowns, and a full multi-line note pane.
 - Configured external scripts run from the browser with confirmation, captured output, success/failure feedback, and an automatic reload and store re-validation afterward.
+- Per-row mark-for-deletion applied on explicit save, with undo and `row_delete` log entries.
 - A read-only in-app change-log viewer with refresh.
 - Add-row workflow, explicit Save button/shortcut, dirty indicator, and unsaved-change warnings.
 - A completely synthetic NextAct example and automated unit/HTTP/JavaScript tests.
@@ -57,7 +58,7 @@ Drag a column's right border to resize it, or focus its resize separator and use
 
 The second header row filters `date` and `dropdown` columns by one exact value. Choices include blank, lookup values, and unknown values actually present in the store. Multiple filters combine with AND logic and the active sort. The status bar shows `Showing X of Y rows` and provides **Clear filters**. Filters are session-only, are not written to preferences or CSV files, and remain active across saves/reloads in the same browser session. Editing and saving include dirty rows even when filters hide them.
 
-**Add row** creates an in-memory row; **Save** or Ctrl/Cmd+S writes all pending changes explicitly. New rows always append at the bottom of the CSV regardless of view sorting or filtering. Reload, repository switching, and browser closing protect unsaved changes with warnings. A revision conflict leaves edits in the grid and requires an explicit reload rather than silently overwriting external changes.
+**Add row** creates an in-memory row; **Save** or Ctrl/Cmd+S writes all pending changes explicitly. New rows always append at the bottom of the CSV regardless of view sorting or filtering. The per-row ✕ control marks an existing row for deletion (click again or ↩ to undo); deletions apply only on Save, never reorder the file, and are logged as `row_delete` entries with the removed values. Reload, repository switching, and browser closing protect unsaved changes with warnings. A revision conflict leaves edits in the grid and requires an explicit reload rather than silently overwriting external changes.
 
 ## Configuration
 
