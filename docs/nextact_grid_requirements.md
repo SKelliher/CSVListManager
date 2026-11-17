@@ -80,6 +80,76 @@ Flags are properties of the column, not special column kinds: `Created` and `Upd
 - The tool maintains a **change log** recording every change made through the application: cell edits, row additions, saves, sorts (optional detail), and every script execution (script name, parameters, result, row counts).
 - The log itself is a plain CSV (machine- and human-readable) but is **non-editable through the tool**: append-only, viewable in the app, never rewritten or truncated by the UI. It lives in the repository directory.
 
+### 3.9 Data structures (normative)
+
+Every structure below is a plain, human-editable file. String fields are Unicode text unless stated otherwise; no field contains binary data. All files are UTF-8.
+
+**Store row (CSV, RFC 4180).** One header row plus one record per row.
+
+| Field | Type | Rules |
+|---|---|---|
+| header row | `string[]` | Column names in schema order; must agree with the schema (3.3) |
+| record | `string[]` | One value per header column, same length; every value is a raw string — typing is interpretive only |
+| value of a `date` column | `date` ISO `YYYY-MM-DD` or empty | Empty permitted |
+| value of a `datetime` column | ISO `YYYY-MM-DD HH:MM` or empty | Empty permitted |
+| value of a `dropdown` column | lookup value or empty | Unknown values tolerated and displayed as-is (3.4) |
+| value of a `text` column | single-line string or empty | No embedded newlines by convention |
+| value of a `note` column | multi-line string or empty | Embedded newlines preserved byte-for-byte |
+
+**Schema file (YAML).**
+
+| Field | Type | Required | Rules |
+|---|---|---|---|
+| `columns` | `column[]` | yes | Order defines column order |
+| `column.name` | `string` | yes | Unique, non-empty |
+| `column.type` | enum | yes | One of `date`, `datetime`, `dropdown`, `text`, `note` |
+| `column.lookup` | `lookup` | dropdown only | See below |
+| `column.on_create` | `boolean` | no | `datetime` columns only; set once at row creation (3.2.1) |
+| `column.on_update` | `boolean` | no | `datetime` columns only; refreshed on every saved edit (3.2.1) |
+| `lookup.values` | `string[]` | exactly one of | Inline list |
+| `lookup.file` | `string` | exactly one of | Relative path to a lookup CSV |
+| `lookup.column` | `string` | with `file` | Column name inside the lookup CSV |
+
+**Lookup file (CSV).** Header row + one row per value. Values are plain strings; the column named by `lookup.column` supplies the dropdown values; other columns are descriptive metadata the tool does not interpret.
+
+**Application configuration (YAML).**
+
+| Field | Type | Required | Rules |
+|---|---|---|---|
+| `repository_root` | path string | yes | Base directory for repository paths |
+| `preferences` | path string | yes | Path to the preferences file (see below) |
+| `repositories` | map of `repository` | ≥1 entry | Key is the repository id (unique string) |
+| `repository.name` | `string` | yes | Display name |
+| `repository.directory` | path string | yes | Resolved against `repository_root` |
+| `repository.store` | path string | yes | Store CSV, relative to the repository directory |
+| `repository.schema` | path string | yes | Schema YAML, relative to the repository directory |
+| `repository.log` | path string | yes | Change-log CSV, relative to the repository directory |
+| `repository.scripts` | `script[]` | no | May be empty |
+| `script.name` | `string` | yes | Unique within the repository |
+| `script.command` | `string[]` | yes | argv: program + arguments |
+| `script.description` | `string` | yes | Shown in the UI |
+
+**Change-log entry (CSV, append-only).** Header: `timestamp,event,repository,details`.
+
+| Field | Type | Rules |
+|---|---|---|
+| `timestamp` | ISO 8601 datetime with UTC offset | Written once at append time |
+| `event` | enum | One of `cell_edit`, `row_add`, `row_delete`, `save`, `script_run` |
+| `repository` | `string` | Repository id |
+| `details` | JSON object or empty | Type-specific; cell_edit: `{row:int, column:string, old:string, new:string}`; row_add: `{row:int, values:string[]}`; row_delete: `{row:int, values:string[]}` (full prior values); save: `{previous_revision:string, revision:string, edit_count:int, addition_count:int, deletion_count:int}`; script_run: `{script:string, status:string, exit_code:int, output:string, detail?:string}` |
+
+**Preferences (JSON).** Application-managed; also hand-editable.
+
+| Field | Type | Rules |
+|---|---|---|
+| `selected_repository` | `string` | Repository id; must exist in configuration |
+| `modes` | map of repo id → enum | `editable` or `read-only` (3.7) |
+| `views` | map of repo id → `view` | Per-repository view state |
+| `view.note_visible` | `boolean` | Note pane visibility |
+| `view.column_widths` | map of column name → int | Width in pixels; keyed by schema column name |
+
+**Store revision.** A string identifying the exact byte content of the store file (its SHA-256 hex digest). The client sends the revision it loaded; a save is accepted only if the revision still matches (external-edit detection, R3). Not stored in any file — recomputed from the file bytes.
+
 ## 4. The Current Instance (nextact.csv)
 
 The existing file is the first configured instance. Its schema expresses the established pattern:
