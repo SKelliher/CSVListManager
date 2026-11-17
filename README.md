@@ -2,6 +2,10 @@
 
 CSVListManager is a configurable, local grid for editing plain RFC 4180 CSV data stores. The CSV remains the source of truth: there is no database, shadow index, cloud account, or runtime network dependency.
 
+![CSVListManager grid with the note editor open in read-only mode](docs/CSVListManager.png)
+
+*The grid over the bundled synthetic example: typed columns, filter row, script menu, and the multi-line note editor.*
+
 This repository contains a Python standard-library service and a dependency-free HTML/vanilla-JavaScript grid. Together they provide typed schemas, human-editable lookup files, safe explicit saves, repository preferences, stable view-only sorting, and an append-only CSV change log.
 
 ## Task Manager Use Case
