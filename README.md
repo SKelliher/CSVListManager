@@ -4,6 +4,120 @@ CSVListManager is a configurable, local grid for editing plain RFC 4180 CSV data
 
 This repository contains a Python standard-library service and a dependency-free HTML/vanilla-JavaScript grid. Together they provide typed schemas, human-editable lookup files, safe explicit saves, repository preferences, stable view-only sorting, and an append-only CSV change log.
 
+## Task Manager Use Case 
+
+CSVListManager was built as a simple CSV file editor for managing lists with a predefined structure. The primary use-case is to manage a task list with the following structure:
+* Date columns for Next and Last (most recent) action on a task
+* Priority as a lookup column on with predefined values: A, B, C for active tasks, L for back-log tasks, N for notes and Z for completed tasks.
+* Tag lookup column with predefined tags for task subject matter
+* Label as a single line descriptive text field
+* Note as a multiline cell for task notes
+
+Required features for the list manager use case include:
+* CRUD functionality (Create, Revise, Update, Delete) on tasks
+* Archiving of completed items defined through an external python script called from within CSVListManager
+* Filtering on lookup column values (e.g. for Priority = A and Next = Today)
+* Sorting on any column
+* Logging of changes
+
+This task list implementation is a minimalist approach to task management. In particular, there's no nesting or linking tasks. Tasks can be grouped by label or tag as needed. The Priority value specifies what actions are in current focus, backlog or complete (similar to Kanban). Last and Next Action dates are drawn from the Getting-Things-Done (GTD) framework. The note field provides a place to store task history, requirements, plan, goal or any other relevant information. Sorting and filtering are sufficient tools to zoom-in on what needs to be worked on now or what is pending in the near futures. This structure also serves as a simple calendar, with appointments treated as tasks. 
+
+Other use-cases include any list management with a fixed data structure.
+
+## Features
+
+### Column types
+
+CSVListManager is generic: the meaning of your data lives entirely in your schema, and every column is declared as one of five built-in types. Types drive how a column is displayed, edited, sorted, and filtered — they never police your data. Values already in the file that don't match a type are displayed as-is, never blocked or rewritten.
+
+#### `text`
+
+Single-line free text — the workhorse for names, titles, short values.
+
+- Edited inline, directly in the grid cell.
+- Sorts lexically, so alphabetical ordering is predictable.
+- Best for: labels, titles, identifiers, any short one-liner.
+
+#### `note`
+
+Multi-line free text for content that doesn't fit a cell.
+
+- Edited in an expanded pane rather than crammed into a row, with embedded newlines preserved byte-for-byte.
+- Sorts by, at most, presence or length — content itself is never rearranged.
+- Best for: descriptions, scratchpads, checklists, URLs, commands, anything long-form. What the content *means* is entirely your convention; the tool just preserves it exactly.
+
+#### `date`
+
+A calendar day in ISO format (`YYYY-MM-DD`), or empty.
+
+- Edited with a date picker or typed directly; both produce the same unambiguous format.
+- Sorts chronologically, so "what's coming up" is one click away.
+- Can be filtered to an exact day (including a blank choice).
+- Best for: deadlines, trigger dates, day-level timestamps.
+
+#### `datetime`
+
+A date and time (`YYYY-MM-DD HH:MM`), or empty.
+
+- Like `date`, but down to the minute, with picker or keyboard entry and chronological sorting.
+- Optionally carries managed behavior: an `on_create` column is stamped once when a row is created through the tool, and an `on_update` column is refreshed on every saved edit — giving you automatic audit columns with zero scripting. Without flags, it's a plain timestamp you manage yourself.
+- Best for: created/updated tracking, minute-level scheduling.
+
+#### `dropdown`
+
+One value chosen from a list you define — either inline in the schema or from a separate lookup file you can edit by hand.
+
+- Editing is a select control, so consistent categorical values are one click instead of free typing.
+- Lookups can carry descriptions, so the meaning of each value is documented beside it.
+- Tolerant by design: values present in the file but missing from the lookup still display as-is.
+- Best for: statuses, categories, priorities, tags — anything where a controlled vocabulary keeps sorting and filtering meaningful.
+
+#### What the type system buys you
+
+- **Schema-driven, not code-driven.** Add, remove, or retype a column by editing the schema; the grid adapts with no tool changes.
+- **The right editor for every cell.** Pickers for dates, selects for dropdowns, panes for notes, inline for text — no mode switching.
+- **Meaningful sorting and filtering.** Dates sort by time, text by alphabet, dropdowns by list order; filters match exact values with blank included.
+- **Your file stays honest.** Types are interpretive, not enforced: the CSV remains plain, portable, and exactly as you left it — in any editor, at all times.
+
+### Data integrity first
+- The CSV file is the source of truth — no database, shadow index, or cloud account
+- Standards-compliant RFC 4180 parsing: quoted commas, quotes, empty fields, and embedded newlines all preserved
+- Field-level saves that leave every untouched byte, quoting style, record order, and line ending exactly as it was
+- Atomic temp-file-and-replace writes with automatic backup on failure
+- Revision checks that refuse to silently overwrite edits made outside the app (HTTP 409, your work stays in the grid)
+
+### Editing
+- Inline editors matched to column type: native date/datetime pickers, dropdown selects, text inputs
+- Multi-line note pane with full-cell editing that preserves each cell's original newline convention (LF or CRLF)
+- Add rows (always appended at the bottom, never re-sorted into the file)
+- Mark rows for deletion with undo; deletions apply only on explicit save
+- Optional managed `on_create`/`on_update` datetime columns owned by the service
+- Editable/read-only mode toggle per repository with a visible mode indicator
+- Explicit Save button and Ctrl/Cmd+S, dirty-state indicator, and unsaved-changes warnings on reload, switch, and close
+
+### Viewing and organization
+- Sticky-header grid with stable ascending/descending sort — view-only, never reorders the file
+- Exact-value filters on date and dropdown columns (including blank and unknown values), combinable with AND logic
+- Live `Showing X of Y rows` count and one-click filter clearing
+- Drag-to-resize columns (80–600 px) persisted per repository and column
+- Show/hide note panel, persisted per repository
+- Dark and light themes via system preference
+
+### Automation and audit
+- Configured external scripts (archive, cleanup, imports…) run from the browser with confirmation
+- Scripts receive repository paths via environment variables; output and exit status are captured
+- Failed scripts report visibly — never a false success — and the store is re-validated after every run
+- Append-only CSV change log records every edit, addition, deletion, save, and script run
+- Read-only in-app change-log viewer with human-readable formatting
+
+### Architecture and deployment
+- Python standard library only — zero runtime dependencies, nothing to build
+- Dependency-free vanilla HTML/JS frontend — no npm, no frameworks
+- Localhost-only HTTP service; no network access required at runtime
+- Multiple named data repositories selectable from a dropdown, configured in one YAML file
+- Schema-driven: columns, types, and lookups are configuration, not code — adapt it to any CSV without touching the source
+- Runs anywhere Python 3.11+ runs; deploy to a headless box and reach it through an SSH tunnel
+
 ## Implemented
 
 - YAML application configuration and schema validation with actionable errors.
