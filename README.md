@@ -199,6 +199,34 @@ repositories:
 
 The repository root is resolved relative to the configuration file. Store, schema, log, and lookup paths must remain inside their configured repository directory. All repositories, stores, schemas, and lookups are validated at startup; invalid user data is not modified.
 
+### Multiple repositories
+
+The `repositories` mapping holds any number of independent data repositories under one service. Each key is a repository id used in the API and the browser URL; each entry has a display `name` plus the paths of its own files:
+
+```yaml
+repositories:
+  tasks:
+    name: Tasks
+    directory: data/tasks
+    store: tasks.csv
+    schema: tasks_schema.yaml
+    log: tasks_changes.csv
+  reading:
+    name: Reading list
+    directory: ~/Documents/reading
+    store: books.csv
+    schema: books_schema.yaml
+    log: books_changes.csv
+    scripts:
+      - name: archive
+        command: [python3, archive.py]
+        description: Move finished books into the archive
+```
+
+Repositories are fully independent: each owns its directory, store, schema, lookups, change log, and scripts, so different repositories can carry entirely different columns and types. File paths may use `~` and are resolved against the repository root; every file must stay inside its own repository directory.
+
+The browser offers all configured repositories in a dropdown and switches between them without restarting the service. The selected repository is persisted, and every view preference — edit/read-only mode, note-panel visibility, and per-column widths — is remembered per repository, so each list keeps its own layout.
+
 Schemas declare an ordered `columns` list. Field types are `date`, `datetime`, `dropdown`, `text`, and `note`. Dropdowns use either inline values or a lookup CSV:
 
 ```yaml
@@ -221,6 +249,16 @@ columns:
 ```
 
 Adding, removing, renaming, or reordering columns requires only schema and corresponding CSV header changes. Values outside a dropdown lookup are preserved and displayed; validation does not police existing data.
+
+## Enhancements
+
+Proposed features for future implementation:
+
+- Multiple active filters with per-column removal — extend the current AND-combined filter row with individually dismissible filter chips.
+- CSV import and export dialogs — bring rows in from, or push the store out to, other tools with column mapping.
+- Saved filter presets — name and reuse common filter combinations (e.g. "priority A due today") per repository.
+- Row duplication — clone an existing row into a new appended row for repetitive entries.
+- Keyboard grid navigation — arrow-key cell movement and Enter-to-commit editing for keyboard-first workflows.
 
 ## Scripts
 
