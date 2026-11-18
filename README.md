@@ -1,5 +1,9 @@
 # CSVListManager
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](README.md#requirements)
+[![No runtime dependencies](https://img.shields.io/badge/dependencies-none-brightgreen.svg)](README.md#requirements)
+
 CSVListManager is a configurable, local grid for editing plain RFC 4180 CSV data stores. The CSV remains the source of truth: there is no database, shadow index, cloud account, or runtime network dependency.
 
 ![CSVListManager grid with the note editor open in read-only mode](docs/CSVListManager.png)
